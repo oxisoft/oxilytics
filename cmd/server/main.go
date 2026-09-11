@@ -21,6 +21,9 @@ import (
 	"github.com/oxisoft/oxilytics/internal/settings"
 	"github.com/oxisoft/oxilytics/internal/setup"
 	"github.com/oxisoft/oxilytics/internal/store"
+	osync "github.com/oxisoft/oxilytics/internal/sync"
+	"github.com/oxisoft/oxilytics/internal/sync/appstore"
+	"github.com/oxisoft/oxilytics/internal/sync/googleplay"
 	"github.com/oxisoft/oxilytics/internal/tester"
 	"github.com/oxisoft/oxilytics/internal/version"
 	"github.com/oxisoft/oxilytics/web"
@@ -73,6 +76,33 @@ func run() error {
 	authSvc := auth.New(db, cfg.SessionKey, cfg.Secure, "Oxilytics")
 	settingsSvc := settings.New(db)
 
+	// sync engine with whichever store clients are configured
+	var ingesters []osync.Ingester
+	if st.Configured(models.StoreAppStore) {
+		c, err := tester.NewASC(cfg)
+		if err != nil {
+			return fmt.Errorf("app store client: %w", err)
+		}
+		ingesters = append(ingesters, appstore.New(c))
+	}
+	if st.Configured(models.StoreGooglePlay) {
+		c, err := tester.NewGPlay(cfg)
+		if err != nil {
+			return fmt.Errorf("google play client: %w", err)
+		}
+		ingesters = append(ingesters, googleplay.New(c))
+	}
+	engine := osync.NewEngine(db, settingsSvc, cfg.TZ, ingesters...)
+	if err := engine.Recover(ctx); err != nil {
+		return err
+	}
+	scheduler := osync.NewScheduler(engine, db, settingsSvc, cfg.TZ, cfg.BackupDir, cfg.BackupKeep)
+	if err := scheduler.Start(ctx); err != nil {
+		return fmt.Errorf("scheduler: %w", err)
+	}
+	defer scheduler.Stop()
+	defer engine.Stop()
+
 	webFS, err := web.FS()
 	if err != nil {
 		return fmt.Errorf("web fs: %w", err)
@@ -85,6 +115,7 @@ func run() error {
 		Settings: settingsSvc,
 		Setup:    st,
 		Tester:   tester.New(cfg),
+		Sync:     httpapi.SyncDeps{Engine: engine, Scheduler: scheduler},
 		WebFS:    webFS,
 	})
 

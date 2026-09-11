@@ -49,6 +49,11 @@ func newTestServer(t *testing.T, setupRequired bool) (*client, *store.DB) {
 
 func (c *client) do(method, path string, body any) (int, map[string]any) {
 	c.t.Helper()
+	return c.doBody(method, path, body)
+}
+
+func (c *client) doBody(method, path string, body any) (int, map[string]any) {
+	c.t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
 		json.NewEncoder(&buf).Encode(body)
@@ -70,6 +75,23 @@ func (c *client) do(method, path string, body any) (int, map[string]any) {
 	var out map[string]any
 	json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
+}
+
+// doRaw decodes into an arbitrary target (arrays etc.), GET only.
+func (c *client) doRaw(method, path string, target any) int {
+	c.t.Helper()
+	req, _ := http.NewRequest(method, c.srv.URL+path, nil)
+	req.Header.Set("X-Requested-With", "fetch")
+	for _, ck := range c.cookies {
+		req.AddCookie(ck)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	json.NewDecoder(resp.Body).Decode(target)
+	return resp.StatusCode
 }
 
 func seedAdmin(t *testing.T, db *store.DB) {
