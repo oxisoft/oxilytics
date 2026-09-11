@@ -56,6 +56,7 @@
           <div class="absolute right-0 mt-1 w-44 rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900" role="menu" tabindex="-1" onmouseleave={() => (userOpen = false)}>
             <div class="px-3 py-1.5 text-xs text-zinc-500">{session.user?.email}<br /><span class="badge mt-1 bg-zinc-100 dark:bg-zinc-800">{session.user?.role}</span></div>
             <a href="/profile" use:link class="flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800" role="menuitem" onclick={() => (userOpen = false)}><Icon name="user" />My profile</a>
+            <a href="/about" use:link class="flex items-center gap-2 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800" role="menuitem" onclick={() => (userOpen = false)}><Icon name="info" />About</a>
             <button class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800" role="menuitem" onclick={logout}><Icon name="logout" />Sign out</button>
           </div>
         {/if}

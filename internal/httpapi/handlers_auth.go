@@ -22,7 +22,7 @@ func (a *API) health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) version(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, 200, map[string]string{"version": version.Version, "commit": version.Commit, "build_time": version.BuildTime})
+	writeJSON(w, 200, map[string]string{"version": version.Version, "commit": version.Commit, "short_commit": version.ShortCommit(), "build_time": version.BuildTime, "go": version.GoVersion, "display": version.String()})
 }
 
 // auth -----------------------------------------------------------------------

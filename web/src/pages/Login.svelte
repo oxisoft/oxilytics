@@ -49,4 +49,7 @@
     {#if error}<p class="text-sm text-red-600" role="alert">{error}</p>{/if}
     <button class="btn-primary w-full justify-center" disabled={busy}>Sign in</button>
   </form>
+  <p class="mt-4 text-center text-xs text-zinc-400">
+    Oxilytics {session.version?.version || ''}{#if session.version?.short_commit && session.version.commit !== 'none' && !session.version.version?.includes(session.version.short_commit.replace('-dirty', ''))}{' · ' + session.version.short_commit}{/if}
+  </p>
 </div>

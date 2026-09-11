@@ -1,0 +1,14 @@
+.git
+bin/
+dist/
+web/node_modules/
+web/dist/
+dev.db*
+dev-backups/
+dev-secrets/
+deploy/data/
+deploy/secrets/
+deploy/.env
+*.p8
+*.pem
+gplay-sa.json

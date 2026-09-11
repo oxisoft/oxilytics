@@ -23,6 +23,7 @@
   import SettingsStores from './pages/SettingsStores.svelte';
   import IgnoredApps from './pages/IgnoredApps.svelte';
   import Profile from './pages/Profile.svelte';
+  import About from './pages/About.svelte';
   import NotFound from './pages/NotFound.svelte';
 
   const routes = {
@@ -44,6 +45,7 @@
     '/settings/stores': SettingsStores,
     '/settings/ignored': IgnoredApps,
     '/profile': Profile,
+    '/about': About,
     '*': NotFound,
   };
 
@@ -78,7 +80,7 @@
       push(session.setupRequired ? '/setup' : '/');
       return;
     }
-    if (session.authenticated && session.setupRequired && !path.startsWith('/setup') && !path.startsWith('/settings') && path !== '/profile') {
+    if (session.authenticated && session.setupRequired && !path.startsWith('/setup') && !path.startsWith('/settings') && path !== '/profile' && path !== '/about') {
       push('/setup');
     }
   });

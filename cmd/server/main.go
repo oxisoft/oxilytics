@@ -31,8 +31,13 @@ import (
 
 func main() {
 	healthcheck := flag.Bool("healthcheck", false, "probe the running server and exit (for Docker HEALTHCHECK)")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
+	if *showVersion {
+		fmt.Println("oxilytics", version.String())
+		return
+	}
 	if *healthcheck {
 		os.Exit(runHealthcheck())
 	}
