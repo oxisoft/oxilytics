@@ -24,13 +24,14 @@ Each milestone ends with `go vet`, `go test`, `npm run build` green and a runnab
 ### M3 — Sync engine (3–4 days)
 - Migrations: products, apps, metric_days, reviews (+FTS), sync_runs, sync_run_logs, sync_checkpoints, ingested_objects.
 - `internal/products`: CRUD, link/unlink with one-platform-per-product rule, name-normalised suggestions (never auto-link) (tests).
+- `internal/apps`: ignore/restore (unlink-on-ignore, exclusion in every query, sync skips ignored) with tests proving viewers can never observe an ignored app.
 - Engine: run lifecycle, per-store mutex, cancellation, progress, logs, checkpoints, full & delta for both stores, interrupted-run recovery.
 - Scheduler (cron) driven by settings; backup + retention job.
 - API: `/sync/*`, `/settings`. Screens: Sync, Sync run detail, Settings–General.
 
 ### M4 — Metrics & dashboard (3 days)
 - `internal/metrics` queries scoped by product/platform/store/app; summary with per-platform split, series grouped by product|platform|store|app|country, day/week/month buckets, countries, products table; CSV export.
-- Screens: Dashboard, Products, Product detail (all tabs except Reviews), Store apps. Chart components incl. platform stacking and donut.
+- Screens: Dashboard, Products, Product detail (all tabs except Reviews), Store apps (incl. Ignore, bulk ignore), Settings – Ignored apps. Chart components incl. platform stacking and donut.
 
 ### M5 — Reviews (1–2 days)
 - `/reviews*` API with FTS, stats. Screens: Reviews list, detail modal, Product detail → Reviews tab.

@@ -51,7 +51,8 @@ The first admin is bootstrapped from env vars on first start (see 08-deployment)
 
 - **Store** — `appstore` or `googleplay`.
 - **Product** — what the publisher ships ("My Notes"). Owns one **store app** per platform. All dashboards are product-centric.
-- **Store app** — one listing on one store (`appstore`/ios, `googleplay`/android, later `msstore`/windows). Belongs to at most one product; unlinked store apps are shown in an "Unassigned" bucket until an admin links them or accepts the auto-suggested match.
+- **Store app** — one listing on one store (`appstore`/ios, `googleplay`/android, later `msstore`/windows). Belongs to at most one product; unlinked store apps are shown in an "Unassigned" bucket until an admin links them or accepts the suggested match.
+- **Ignored store app** — a listing an admin does not want to see (stale, test build, discontinued). Ignored apps are excluded from sync, from all lists, counts and totals, and from the viewer role entirely; admins see them only in *Settings → Ignored apps*. Ignoring is reversible; existing data is kept.
 - **Platform** — `ios`, `macos`, `android`, `windows`; derived from the store app, used as the breakdown dimension. An App Store listing that ships iOS and macOS under one id is `ios`; a macOS-only listing is `macos`.
 - **Sync run** — one execution of the sync for one store, in mode `full` or `delta`.
 - **Checkpoint** — per (store, source) marker of what has been ingested, used by delta runs.

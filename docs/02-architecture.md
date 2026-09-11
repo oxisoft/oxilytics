@@ -137,6 +137,7 @@ Pure table, no I/O:
 |--------|-------|--------|
 | view dashboard / products / apps / metrics / reviews | ✔ | ✔ |
 | create / edit products, link & unlink store apps | ✔ | ✖ |
+| ignore / restore store apps, view ignored list | ✔ | ✖ |
 | view setup guide & status | ✔ | ✔ |
 | run store connection test | ✔ | ✖ |
 | view sync status & history | ✔ | ✔ |

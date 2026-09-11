@@ -50,13 +50,17 @@ A product has **at most one store app per platform** (enforced by a unique index
 | icon_url | TEXT | |
 | product_id | INTEGER FK products NULL | NULL = unassigned |
 | suggested_product_id | INTEGER FK products NULL | auto-match suggestion awaiting admin confirmation |
-| enabled | INTEGER NOT NULL DEFAULT 1 | disabled apps are skipped by sync and hidden by default |
+| ignored_at | TEXT NULL | NULL = active. Set → excluded from sync and from every non-admin query; data retained |
+| ignored_by | INTEGER FK users NULL | |
+| ignored_reason | TEXT | free text shown in the Ignored list ("old test build") |
 | rating_avg | REAL | current store-wide average, refreshed each sync (Apple: iTunes lookup; Google: latest `Total Average Rating`) |
 | rating_count | INTEGER | Apple only (`userRatingCount`); NULL on Google |
 | rating_updated_at | TEXT | |
 | first_seen_at, last_synced_at | TEXT | |
 | UNIQUE(store, store_app_id) | | |
 | UNIQUE(product_id, platform) WHERE product_id IS NOT NULL | | |
+
+Ignoring an app that is linked to a product **unlinks it first** (a product must not show a ghost platform). Every store/metrics/reviews query joins `apps` with `ignored_at IS NULL` unless the caller explicitly asks for ignored rows (admin endpoints only). Index on `apps(ignored_at)`.
 
 All metric and review rows hang off the **store app**; product-level numbers are
 `SUM`/`AVG` over `apps.product_id` at query time (indexes on `apps(product_id)` and

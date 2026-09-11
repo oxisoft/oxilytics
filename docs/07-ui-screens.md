@@ -51,6 +51,7 @@ a sync"), error banner with retry, and "store not configured" notices.
 | `#/settings` | Settings – General | admin |
 | `#/settings/users` | Settings – Users | admin |
 | `#/settings/stores` | Settings – Stores (status + guides, same component as Setup) | admin |
+| `#/settings/ignored` | Settings – Ignored apps | admin |
 | `#/profile` | My profile | any |
 | `#/about` | About (modal) | any |
 | `*` | 404 | |
@@ -108,8 +109,8 @@ Purpose: one glance at how every product is doing, and how platforms compare.
   downloads and rating, total, last synced.
 - Admin: **New product**, edit (name, icon, description), archive.
 - **Unassigned store apps** section (admin): each with the suggestion
-  ("Looks like *My Notes* → Link" / "Create product 'My Notes'"), or a
-  product picker. Nothing is linked without a click here — this is the one place the
+  ("Looks like *My Notes* → Link" / "Create product 'My Notes'"), a
+  product picker, and an **Ignore** action for listings that should not become a product. Nothing is linked without a click here — this is the one place the
   iOS ↔ Android linking happens.
 - Empty state: "No products yet. Run a full sync to discover store apps, then link them here."
 
@@ -128,16 +129,19 @@ Purpose: one glance at how every product is doing, and how platforms compare.
   - **Crashes** — crashes (+ ANRs on Android) per platform; crash rate line.
   - **Ratings** — current rating & count per platform, review-star histogram per platform side by side (from reviews in range).
   - **Reviews** — Reviews list pre-filtered to this product, platform glyph per row.
-  - **Store apps** (admin) — the linked listings with ids, enable toggle, unlink, and
+  - **Store apps** (admin) — the linked listings with ids, unlink, ignore, and
     "Link another platform" picker for unassigned store apps.
 
 ## 8. Store apps (`#/apps`)
 Raw view of what the stores expose, mainly for admins.
 - Table: icon, name, store, platform, store id / package, product (link or
-  "— unassigned —" with suggestion), enabled, first seen, last synced, 30-day downloads.
+  "— unassigned —" with suggestion), first seen, last synced, 30-day downloads.
+  Ignored apps never appear here.
 - Filters: store, platform, unassigned only; search.
-- Admin: inline enable toggle, edit (name, icon URL), **Link to product** picker,
-  **Create product from this app**.
+- Admin row actions: edit (name, icon URL), **Link to product** picker,
+  **Create product from this app**, **Ignore…** (dialog: optional reason; warns
+  "This will unlink it from *My Notes*" when linked). Bulk select → Ignore for cleaning
+  up after a first full sync that discovers a dozen old listings.
 
 ## 9. Reviews (`#/reviews`)
 - Filter bar: product, platform, rating (1–5 multi), country, date range, replied, full-text search.
@@ -176,6 +180,16 @@ Raw view of what the stores expose, mainly for admins.
 ## 14. Settings – Stores (`#/settings/stores`)
 Same component as **Setup** (store cards, checks, guides, test connection), embedded in
 the settings layout. This is where an admin adds the second store later.
+
+## 14b. Settings – Ignored apps (`#/settings/ignored`)
+The only place ignored listings exist. Deliberately tucked under Settings so day-to-day
+screens stay clean.
+- Table: icon, name, store, platform, store id / package, reason, ignored by, ignored
+  on, last data day, rows of data kept.
+- Row actions: **Restore** (returns to Store apps as unassigned; next sync resumes it),
+  edit reason.
+- Empty state: "Nothing ignored. Use *Ignore* on a store app to hide listings you don't care about."
+- Viewers get a 403 for this route and never see a count or hint that ignored apps exist.
 
 ## 15. My profile (`#/profile`)
 - Name, email (read-only), change password, TOTP enable (QR via inline generator) /

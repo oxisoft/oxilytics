@@ -31,7 +31,7 @@ queued ──▶ running ──▶ succeeded
 
 ## Steps of a run
 
-1. Load enabled store apps for the store (full mode also refreshes the catalogue first and inserts new apps). New store apps are **never linked automatically**: if `products.suggest` is on, a normalised-name match sets `suggested_product_id`; the app stays unassigned until an admin confirms on the Products screen. The run summary and the Sync screen flag unassigned apps.
+1. Load active (`ignored_at IS NULL`) store apps for the store (full mode also refreshes the catalogue first and inserts new apps; a listing that already exists as ignored stays ignored and is not re-surfaced). New store apps are **never linked automatically**: if `products.suggest` is on, a normalised-name match sets `suggested_product_id`; the app stays unassigned until an admin confirms on the Products screen. The run summary and the Sync screen flag unassigned apps — that notice is the natural moment to either link or ignore each new listing.
 2. For each app (sequentially — the stores rate-limit per account, not per app):
    1. metrics (downloads/installs/uninstalls)
    2. crashes

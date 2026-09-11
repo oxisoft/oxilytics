@@ -44,9 +44,14 @@ When `setup_required` is true every other data/sync endpoint returns `503 {"erro
 | POST | `/products/suggestions/accept` | admin | `{app_id, product_id?}` — link to existing or create product from the app's name |
 
 ## Store apps
-| GET | `/apps?store=&platform=&product_id=&unassigned=1` | any | list with last-synced, totals for last 30 days |
-| GET | `/apps/{id}` | any | |
-| PUT | `/apps/{id}` | admin | name, icon_url, enabled |
+| GET | `/apps?store=&platform=&product_id=&unassigned=1` | any | active apps only, with last-synced, totals for last 30 days |
+| GET | `/apps/{id}` | any | `404` for viewers if the app is ignored |
+| PUT | `/apps/{id}` | admin | name, icon_url |
+| POST | `/apps/{id}/ignore` | admin | `{reason?}` → unlinks from product if linked, sets `ignored_at`; `409` if a sync is currently processing it (retry after) |
+| POST | `/apps/{id}/restore` | admin | clears ignore; app returns as unassigned |
+| GET | `/apps/ignored` | admin | ignored list with reason, who, when, last data day |
+
+All list/metric/review endpoints silently exclude ignored apps; there is no `include_ignored` flag outside `/apps/ignored`.
 
 ## Metrics
 All metric endpoints accept the same scope filters: `product_id`, `platform`, `store`,

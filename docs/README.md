@@ -24,6 +24,7 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 - v1 covers **App Store and Google Play only** (Microsoft Store later).
 - **Products are first-class**: a product (e.g. "My Notes") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
 - **At least one store must be configured** or the app refuses to do anything except show the setup guide.
+- **Store apps can be ignored**: an admin marks stale/uninteresting listings as ignored; they disappear from every screen and from sync, and live only in an admin-only "Ignored apps" list where they can be restored.
 - **Linking is always manual**: sync never auto-links a store app to a product; it only suggests, an admin confirms.
 - **No rating history in v1**: only the current store-wide average/count per store app (refreshed each sync) plus review stars. Daily rating series are v2.
 - An App Store listing covering iOS+macOS is platform `ios`; macOS-only is `macos`.
