@@ -21,6 +21,7 @@ import (
 	"github.com/oxisoft/oxilytics/internal/settings"
 	"github.com/oxisoft/oxilytics/internal/setup"
 	"github.com/oxisoft/oxilytics/internal/store"
+	"github.com/oxisoft/oxilytics/internal/tester"
 	"github.com/oxisoft/oxilytics/internal/version"
 	"github.com/oxisoft/oxilytics/web"
 )
@@ -83,6 +84,7 @@ func run() error {
 		Auth:     authSvc,
 		Settings: settingsSvc,
 		Setup:    st,
+		Tester:   tester.New(cfg),
 		WebFS:    webFS,
 	})
 
