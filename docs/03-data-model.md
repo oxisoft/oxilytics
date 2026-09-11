@@ -23,7 +23,22 @@ days, RFC 3339 UTC for timestamps). Booleans are `INTEGER 0/1`.
 ### settings
 | key TEXT PK | value TEXT NOT NULL | updated_at TEXT |
 
-### apps
+### products
+| column | type | notes |
+|--------|------|-------|
+| id | INTEGER PK | |
+| name | TEXT NOT NULL UNIQUE | "Habit Observer" |
+| slug | TEXT NOT NULL UNIQUE | url-safe, used in routes |
+| icon_url | TEXT | falls back to the first linked store app's icon |
+| description | TEXT | |
+| archived | INTEGER NOT NULL DEFAULT 0 | hidden from dashboard, data kept |
+| created_at, updated_at | TEXT | |
+
+A product has **at most one store app per platform** (enforced by a unique index on
+`apps(product_id, platform) WHERE product_id IS NOT NULL`). Adding Windows later is a new
+`store`/`platform` value, no schema change.
+
+### apps (store apps)
 | column | type | notes |
 |--------|------|-------|
 | id | INTEGER PK | |
@@ -33,10 +48,17 @@ days, RFC 3339 UTC for timestamps). Booleans are `INTEGER 0/1`.
 | bundle_id | TEXT | iOS bundle id (same as store_app_id on Android) |
 | platform | TEXT | `ios`, `macos`, `android` … |
 | icon_url | TEXT | |
-| product_key | TEXT | optional; same value on both stores groups them in the UI |
+| product_id | INTEGER FK products NULL | NULL = unassigned |
+| suggested_product_id | INTEGER FK products NULL | auto-match suggestion awaiting admin confirmation |
 | enabled | INTEGER NOT NULL DEFAULT 1 | disabled apps are skipped by sync and hidden by default |
 | first_seen_at, last_synced_at | TEXT | |
 | UNIQUE(store, store_app_id) | | |
+| UNIQUE(product_id, platform) WHERE product_id IS NOT NULL | | |
+
+All metric and review rows hang off the **store app**; product-level numbers are
+`SUM`/`AVG` over `apps.product_id` at query time (indexes on `apps(product_id)` and
+`metric_days(app_id, day)` make that cheap). Re-linking a store app to another product
+never moves data — it is just a foreign-key change.
 
 ### metric_days
 One row per app × day × country. `country` is ISO-3166 alpha-2 or `ZZ` for unknown.

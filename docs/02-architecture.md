@@ -52,7 +52,8 @@ Rules:
 /internal/auth                 sessions (gorilla), bcrypt, TOTP, middleware RequireUser/RequireAdmin
 /internal/permissions          Can(user, action, resource) bool — pure
 /internal/httpapi              router.go, handlers_*.go, respond.go, errors.go
-/internal/apps                 app catalogue service
+/internal/products             products + store-app linking, auto-match suggestions
+/internal/apps                 store-app catalogue service
 /internal/metrics              aggregation queries for dashboard (series, totals, breakdowns)
 /internal/reviews              review listing/search service
 /internal/sync                 engine: runs, modes, checkpoints, scheduler, progress
@@ -61,6 +62,7 @@ Rules:
 /internal/storeclient/appstoreconnect   JWT auth, analytics reports, reviews, apps
 /internal/storeclient/googleplay        service-account auth, GCS bucket reader, reviews API
 /internal/settings             typed access to the settings table
+/internal/setup                setup-mode detection, per-store guide metadata, connection tests
 /internal/backup               VACUUM INTO + rotation
 /internal/version              Version, Commit, BuildTime (ldflags)
 /web                           Svelte 5 + Vite + Tailwind 4 + svelte-spa-router + svelte-i18n + chart.js
@@ -95,8 +97,15 @@ All prefixed `OXI_`. Read once at start; the process refuses to start on invalid
 | `OXI_BACKUP_DIR` | `/data/backups` | empty string disables backups |
 | `OXI_BACKUP_KEEP` | `14` | number of daily backups kept |
 
-A store is **enabled** when its credentials are configured; otherwise it is shown as
-"not configured" in the UI and its sync actions are disabled.
+A store is **configured** when all its variables are set and the files exist and parse
+(the `.p8` is a valid EC key, the service-account JSON has `client_email`/`private_key`).
+Validation happens at start-up and the result is exposed on `/api/setup/status`.
+
+- **0 stores configured → setup mode** (see 01-overview): the API serves only `/auth/*`,
+  `/me`, `/setup/*`, `/version`, `/health`; everything else answers `503 setup_required`.
+  The SPA routes every screen to `#/setup`.
+- 1 store configured → normal mode; the other store's card shows "Not configured — set up" linking to its guide.
+- Configuration is re-checked only at start-up (credentials are files/env, so a restart is needed anyway).
 
 ## Runtime settings (DB `settings` table)
 
@@ -110,6 +119,7 @@ Editable by admins in the UI, applied without restart:
 | `sync.delta.overlap_days` | `3` | delta runs re-fetch this many days back (stores restate recent days) |
 | `metrics.retention_days` | `0` | 0 = keep forever |
 | `ui.default_range_days` | `30` | initial dashboard range |
+| `products.auto_link` | `true` | when sync discovers a new store app, auto-link it to a product whose normalised name matches exactly; otherwise leave unassigned with a suggestion |
 
 ## Auth
 
@@ -125,7 +135,10 @@ Pure table, no I/O:
 
 | Action | admin | viewer |
 |--------|-------|--------|
-| view dashboard / apps / metrics / reviews | ✔ | ✔ |
+| view dashboard / products / apps / metrics / reviews | ✔ | ✔ |
+| create / edit products, link & unlink store apps | ✔ | ✖ |
+| view setup guide & status | ✔ | ✔ |
+| run store connection test | ✔ | ✖ |
 | view sync status & history | ✔ | ✔ |
 | start / cancel sync | ✔ | ✖ |
 | edit settings | ✔ | ✖ |

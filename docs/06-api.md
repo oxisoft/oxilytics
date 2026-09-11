@@ -25,23 +25,45 @@ Dates in query params are `YYYY-MM-DD` in `OXI_TZ`.
 | PUT | `/users/{id}/password` | reset |
 | DELETE | `/users/{id}` | cannot delete self / last admin |
 
-## Apps
-| GET | `/apps?store=&enabled=` | any | list with last-synced, totals for last 30 days |
+## Setup
+| GET | `/setup/status` | any | `{setup_required, stores:{appstore:{configured, checks:[{name,ok,detail}]}, googleplay:{…}}}` — checks: env var set, file readable, key parses, sa e-mail, bucket name |
+| POST | `/setup/test/{store}` | admin | live connection test: ASC `GET /v1/apps?limit=1`; Play: list bucket with `maxResults=1` + `reviews.list` on first package. Returns `{ok, steps:[{name,ok,detail}]}` with actionable error text (e.g. "403: the service account is not invited in Play Console") |
+| GET | `/setup/guide/{store}` | any | guide metadata (env var names, current values masked, links) — the guide text itself lives in the SPA locale file |
+
+When `setup_required` is true every other data/sync endpoint returns `503 {"error":{"code":"setup_required"}}`.
+
+## Products
+| GET | `/products?archived=` | any | list with linked store apps, per-platform 30-day downloads, rating |
+| POST | `/products` | admin | `{name, icon_url?, description?}` |
+| GET | `/products/{id}` | any | product + store apps |
+| PUT | `/products/{id}` | admin | name, icon_url, description, archived |
+| DELETE | `/products/{id}` | admin | only when no store apps linked |
+| POST | `/products/{id}/apps` | admin | `{app_id}` link; `409 platform_taken` if the product already has that platform |
+| DELETE | `/products/{id}/apps/{app_id}` | admin | unlink → store app becomes unassigned |
+| GET | `/products/suggestions` | admin | unassigned store apps with `suggested_product_id` or a proposed new product name |
+| POST | `/products/suggestions/accept` | admin | `{app_id, product_id?}` — link to existing or create product from the app's name |
+
+## Store apps
+| GET | `/apps?store=&platform=&product_id=&unassigned=1` | any | list with last-synced, totals for last 30 days |
 | GET | `/apps/{id}` | any | |
-| PUT | `/apps/{id}` | admin | name, icon_url, product_key, enabled |
+| PUT | `/apps/{id}` | admin | name, icon_url, enabled |
 
 ## Metrics
-| GET | `/metrics/summary?from=&to=&store=&app_id=` | any | totals + deltas vs previous period: downloads, updates, uninstalls, crashes, avg rating, review count |
-| GET | `/metrics/series?from=&to=&metric=downloads&group=app\|store\|country&app_id=&store=` | any | `{days:[…], series:[{key,label,values:[…]}]}` |
-| GET | `/metrics/countries?from=&to=&metric=&app_id=` | any | top-N breakdown |
+All metric endpoints accept the same scope filters: `product_id`, `platform`, `store`,
+`app_id` (any combination; omitted = everything). `group` chooses the series dimension.
+
+| GET | `/metrics/summary?from=&to=&<scope>` | any | totals + deltas vs previous period: downloads, updates, uninstalls, crashes, avg rating, review count; plus `by_platform:{ios:{…}, android:{…}}` |
+| GET | `/metrics/series?from=&to=&metric=downloads&group=product\|platform\|store\|app\|country&bucket=day\|week\|month&<scope>` | any | `{buckets:[…], series:[{key,label,platform?,values:[…]}]}` |
+| GET | `/metrics/countries?from=&to=&metric=&<scope>` | any | top-N breakdown |
+| GET | `/metrics/products?from=&to=` | any | one row per product: totals + per-platform split (feeds the dashboard table) |
 | GET | `/metrics/export.csv?…` | any | same filters, CSV download |
 
 `metric` ∈ `downloads, redownloads, updates, uninstalls, active_devices, crashes, anrs, rating_avg, rating_count`.
 
 ## Reviews
-| GET | `/reviews?store=&app_id=&rating=&from=&to=&q=&country=&replied=&page=&per_page=` | any | paginated, newest first; `q` uses FTS |
+| GET | `/reviews?product_id=&platform=&store=&app_id=&rating=&from=&to=&q=&country=&replied=&page=&per_page=` | any | paginated, newest first; `q` uses FTS |
 | GET | `/reviews/{id}` | any | |
-| GET | `/reviews/stats?from=&to=&app_id=` | any | rating histogram 1–5, avg, count |
+| GET | `/reviews/stats?from=&to=&<scope>` | any | rating histogram 1–5, avg, count, per-platform split |
 
 ## Sync
 | GET | `/sync/status` | any | per store: configured, running run (with progress), last run, next scheduled |
@@ -58,4 +80,4 @@ Dates in query params are `YYYY-MM-DD` in `OXI_TZ`.
 
 ## System
 | GET | `/version` | — | `{version, commit, build_time, go}` |
-| GET | `/health` | — | `{ok:true, db:"ok"}`; used by Docker `HEALTHCHECK` |
+| GET | `/health` | — | `{ok:true, db:"ok", setup_required:false}`; used by Docker `HEALTHCHECK` |

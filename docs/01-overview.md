@@ -11,7 +11,7 @@ reports are only kept for ~1 year, and Google Play `reviews.list` returns only t
 
 | Area | App Store Connect | Google Play |
 |------|-------------------|-------------|
-| App catalogue (name, id, icon, platform) | `GET /v1/apps` | package list from bucket file names + `edits`/`applications` details |
+| App catalogue (name, id, icon, platform) | `GET /v1/apps` + iTunes lookup | package list from bucket file names + Android Publisher `edits.listings` / `edits.images` |
 | Downloads / installs per day, per country | Analytics Reports API (`App Store Downloads` / `App Store Installation and Deletion`) | `stats/installs/*_overview.csv` and `*_country.csv` |
 | Updates, uninstalls/deletions | same reports | same CSVs |
 | Ratings: daily average, count | derived from reviews + iTunes lookup for the store-wide average | `stats/ratings/*_overview.csv` (`Daily Average Rating`, `Total Average Rating`) |
@@ -29,6 +29,15 @@ Everything is **read-only** against the stores. v1 does not reply to reviews.
 - Editing anything on the stores.
 - Mobile app; the SPA is responsive, that is enough.
 
+## Minimum configuration
+
+The app is useless without store data, so **at least one store must be configured**
+(credentials present and valid). Start-up still succeeds — otherwise nobody could read
+the in-app guide — but the process enters **setup mode**: a warning is logged, `/api/health`
+reports `setup_required: true`, and the UI shows only the *Setup* screen (login still
+required) until an admin has provided credentials and restarted the container. Adding
+the second store later is the same procedure.
+
 ## Users
 
 - **admin** — everything: users, settings, run sync, view data.
@@ -39,7 +48,9 @@ The first admin is bootstrapped from env vars on first start (see 08-deployment)
 ## Glossary
 
 - **Store** — `appstore` or `googleplay`.
-- **App** — one store listing. The same product on both stores is two `app` rows linked by an optional `product_key` so the dashboard can show them together.
+- **Product** — what OxiSoft ships ("Habit Observer"). Owns one **store app** per platform. All dashboards are product-centric.
+- **Store app** — one listing on one store (`appstore`/ios, `googleplay`/android, later `msstore`/windows). Belongs to at most one product; unlinked store apps are shown in an "Unassigned" bucket until an admin links them or accepts the auto-suggested match.
+- **Platform** — `ios`, `macos`, `android`, `windows`; derived from the store app, used as the breakdown dimension.
 - **Sync run** — one execution of the sync for one store, in mode `full` or `delta`.
 - **Checkpoint** — per (store, source) marker of what has been ingested, used by delta runs.
 - **Metric day** — one row per (app, date, country) with counters.

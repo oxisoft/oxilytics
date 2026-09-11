@@ -71,7 +71,7 @@ Quirks:
 - Files are **UTF-16 LE with BOM**, comma-separated; the client transcodes.
 - The current month's file is rewritten daily; Google also restates the last few days. Delta re-downloads the current and previous month regardless of `generation`, older months only if `generation` changed (`ingested_objects`).
 - Ratings count per day is not in the CSV; `rating_count` on Android is derived from reviews (approximate) and `rating_total_count` from `androidpublisher` is not available → left NULL. The dashboard shows "Total average" only.
-- Package list = distinct `{pkg}` in file names. App display name and icon: Android Publisher API `edits.insert` + `edits.details.get` is clumsy; v1 uses the public listing page scrape fallback **no** — instead the admin sets name/icon in the Apps screen, pre-filled with the package name. (Open question in 09-roadmap.)
+- Package list = distinct `{pkg}` in file names. Display name and icon are read through the Android Publisher API: `edits.insert` → `edits.listings.get(defaultLanguage)` → `title`, then `edits.images.list(icon)` → URL, then `edits.delete`. Clumsy but official and cheap (once per full sync). If it fails, the store app is created with the package name as name and the admin can override it in the Apps screen.
 
 ### Reviews API
 `GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{pkg}/reviews?maxResults=100&translationLanguage=en`

@@ -17,13 +17,16 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 | [07-ui-screens.md](07-ui-screens.md) | Every screen of the SPA, routes, states, components |
 | [08-deployment.md](08-deployment.md) | Dockerfile, docker-compose, env vars, reverse proxy, backups, CI |
 | [09-roadmap.md](09-roadmap.md) | Milestones, definition of done, open questions |
+| [10-store-setup-guides.md](10-store-setup-guides.md) | Step-by-step credential setup for App Store Connect and Google Play (also rendered inside the app) |
 
 ## Decisions already taken
 
 - v1 covers **App Store and Google Play only** (Microsoft Store later).
+- **Products are first-class**: a product (e.g. "Habit Observer") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
+- **At least one store must be configured** or the app refuses to do anything except show the setup guide.
 - v1 data: **downloads/installs, ratings & reviews, crashes**. No revenue, no subscriptions.
 - **Single workspace**, several users with roles `admin` / `viewer`.
-- Store credentials are **mounted files / env vars** — never entered through the UI, never stored in the DB.
+- Store credentials are **mounted files / env vars** — never entered through the UI, never stored in the DB. The UI contains a **setup guide** per store with the exact steps and a connection test.
 - Sync runs in two modes, **full** (from account creation) and **delta** (since last successful run), started **manually from the dashboard** or **once a day at a configurable time**.
 - Charts use **Chart.js** (the only third-party UI dependency); everything else is hand-written Svelte + Tailwind.
 - CI is **GitHub Actions**, images go to **ghcr.io/oxisoft/oxilytics**, UI is **English only** (svelte-i18n is still wired so a second locale is a file drop).

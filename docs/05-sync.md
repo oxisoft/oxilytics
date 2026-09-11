@@ -22,6 +22,7 @@ queued ──▶ running ──▶ succeeded
                   └──▶ interrupted   (process restarted; set on startup for any run still `running`)
 ```
 
+- Sync endpoints answer `503 setup_required` when no store is configured, `409 store_not_configured` for a store without credentials.
 - At most **one run per store** at a time; a second request returns `409 sync_already_running`.
 - Both stores can run in parallel (independent goroutines, independent rate limits).
 - Each run gets a `context.Context` with cancel stored in the engine's `running` map.
@@ -30,7 +31,7 @@ queued ──▶ running ──▶ succeeded
 
 ## Steps of a run
 
-1. Load enabled apps for the store (full mode also refreshes the catalogue first and inserts new apps).
+1. Load enabled store apps for the store (full mode also refreshes the catalogue first and inserts new apps). New store apps go through `products.Link`: exact normalised-name match to an existing product → linked (if `products.auto_link`), fuzzy match → `suggested_product_id`, none → unassigned. The run log and the Products screen surface unassigned apps.
 2. For each app (sequentially — the stores rate-limit per account, not per app):
    1. metrics (downloads/installs/uninstalls)
    2. crashes

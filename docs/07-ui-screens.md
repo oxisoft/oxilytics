@@ -2,29 +2,34 @@
 
 Svelte 5 (runes) SPA, hash routing (`svelte-spa-router`), Tailwind 4, Chart.js for
 charts, svelte-i18n with `en.json`. Dark/light follows `prefers-color-scheme` with a
-manual toggle persisted in `localStorage`. No icon package: the ~15 icons needed are
-inline SVG components in `src/lib/icons/`.
+manual toggle persisted in `localStorage`. No icon package: the ~20 icons needed
+(incl. platform glyphs for iOS / Android / Windows) are inline SVG components in `src/lib/icons/`.
+
+The UI is **product-centric**: users think in "Habit Observer", not in "bundle id on
+App Store". Platform is a breakdown dimension everywhere, never the primary navigation.
 
 ## Layout
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ ◈ Oxilytics   Dashboard  Apps  Reviews  Sync  [Settings]  ● me│  top bar (Settings admin-only)
-├──────────────────────────────────────────────────────────────┤
-│  [global filter bar: store ▾ | app ▾ | date range ▾ ]          │  on data screens
-│                                                                │
-│  page content                                                  │
-│                                                                │
-├──────────────────────────────────────────────────────────────┤
-│ v1.2.0 (a1b2c3d) · last sync: App Store 06:31, Google Play 06:34│  footer
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│ ◈ Oxilytics   Dashboard  Products  Reviews  Sync  [Settings]   ● me │  top bar (Settings admin-only)
+├────────────────────────────────────────────────────────────────────┤
+│  [filter bar:  product ▾ | platform: All ▢iOS ▢Android | range ▾ ] │  on data screens
+│                                                                     │
+│  page content                                                       │
+│                                                                     │
+├────────────────────────────────────────────────────────────────────┤
+│ v1.2.0 (a1b2c3d) · last sync: App Store 06:31 · Google Play 06:34   │  footer
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-Global filter state (store, app, date range) lives in a store and is mirrored into the
-URL hash query so links are shareable. Date-range presets: 7d, 30d, 90d, 12m, YTD, custom.
+Global filter state (product, platforms, date range) lives in a store and is mirrored
+into the URL hash query so links are shareable. Platform filter is a multi-toggle
+(All / iOS / Android / … — only platforms with a configured store are shown). Date-range
+presets: 7d, 30d, 90d, 12m, YTD, custom.
 
 Common states every data screen implements: loading skeleton, empty ("No data yet — run
-a sync"), error banner with retry, and a "store not configured" notice.
+a sync"), error banner with retry, and "store not configured" notices.
 
 ## Routes
 
@@ -32,107 +37,158 @@ a sync"), error banner with retry, and a "store not configured" notice.
 |-------|--------|------|
 | `#/login` | Login | public |
 | `#/login/totp` | TOTP step | public (pending session) |
+| `#/setup` | Setup (store guides + status) | any; **the only screen in setup mode** |
+| `#/setup/appstore`, `#/setup/googleplay` | Store guide | any |
 | `#/` | Dashboard | any |
-| `#/apps` | Apps list | any |
-| `#/apps/:id` | App detail | any |
+| `#/products` | Products | any |
+| `#/products/:slug` | Product detail | any |
+| `#/products/:slug/:platform` | Product detail scoped to one platform (same screen, filter preset) | any |
+| `#/apps` | Store apps (raw listings, linking) | any (edit admin) |
 | `#/reviews` | Reviews | any |
-| `#/reviews/:id` | Review detail (modal over list, also deep-linkable) | any |
+| `#/reviews/:id` | Review detail (modal over list, deep-linkable) | any |
 | `#/sync` | Sync | any (actions admin) |
 | `#/sync/runs/:id` | Sync run detail | any |
 | `#/settings` | Settings – General | admin |
 | `#/settings/users` | Settings – Users | admin |
-| `#/settings/stores` | Settings – Stores (read-only status of credentials) | admin |
+| `#/settings/stores` | Settings – Stores (status + guides, same component as Setup) | admin |
 | `#/profile` | My profile | any |
 | `#/about` | About (modal) | any |
 | `*` | 404 | |
 
 ## 1. Login
 - Email, password, "Sign in". Error inline ("Invalid credentials"), rate-limit message.
-- Redirects to the route the user originally requested.
+- Redirects to the route the user originally requested (or `#/setup` in setup mode).
 
 ## 2. TOTP step
 - 6-digit input, autofocus, auto-submit on 6 chars; link "Use a recovery code".
 
-## 3. Dashboard (`#/`)
-Purpose: one glance at how everything is doing.
-- **KPI cards** (for filter range, with delta vs previous period, colour-coded):
-  Downloads · Updates · Uninstalls · Crashes · Avg rating · New reviews.
-- **Downloads over time** — line chart, one series per store (or per app when a store is selected). Toggle: daily / weekly / monthly buckets.
-- **Crashes over time** — bar chart, same grouping.
-- **Ratings** — small line chart of `rating_total_avg` per app + histogram of review stars in range.
-- **Top countries** — horizontal bar, top 10 by downloads, with share %.
-- **Apps table** — one row per app: icon, name, store badge, downloads (range), Δ%, crashes, rating, last review date; click → App detail. Sortable.
-- **Recent reviews** — last 5, star + first line, click → Reviews.
-- **Sync banner** — if a sync is running: progress bar; if last run failed: warning link to Sync.
+## 3. Setup (`#/setup`)
+Shown as the landing page when **no store is configured**; also reachable any time from
+Settings → Stores. Purpose: get an admin from "fresh container" to "first sync" without
+reading external docs.
 
-## 4. Apps (`#/apps`)
-- Table of all apps grouped by `product_key` when set (one row expands into iOS + Android).
-- Columns: icon, name, store, id/package, platform, enabled, first seen, last synced, 30-day downloads.
-- Filter store / enabled; search.
-- Admin: inline toggle **enabled**, edit dialog (name, icon URL, product key).
-- Empty state: "No apps yet. Run a full sync to discover apps."
+- Banner: "Oxilytics needs access to at least one store. Configure App Store Connect or
+  Google Play below, restart the container, then run a full sync."
+- Two **store cards**, each with: status (Not configured / Configured ✔ / Error ✖ with
+  the failing check), the list of checks from `/setup/status` (env var set → file found →
+  key parses → …), a **"Open guide"** button, and (admin, when configured) **"Test connection"**
+  which shows step-by-step results (auth OK → apps listed: 3 → reviews readable ✔).
+- Footer: "Where do these values go?" → shows the exact `docker-compose.yml` / `.env`
+  snippet with the current variable names, copy button.
+- Viewer role sees the same page read-only with "Ask an administrator" hint.
 
-## 5. App detail (`#/apps/:id`)
-- Header: icon, name, store badge, bundle/package, link to store page, "Sync this app" (admin, delta, single app).
-- Same KPI cards as dashboard, scoped.
-- Tabs:
-  - **Downloads** — line chart downloads / redownloads / updates / uninstalls (toggle series); table by day (paginated) with CSV export.
-  - **Countries** — map-free: table + bar chart of downloads by country, range-scoped.
-  - **Crashes** — bar chart crashes (+ ANRs on Android); crash rate per 1k downloads line.
-  - **Ratings** — `rating_total_avg` over time, daily rating count, histogram.
-  - **Reviews** — the Reviews list pre-filtered to this app.
-- Sibling link: "See Android version →" when `product_key` matches.
+## 4. Store guide (`#/setup/appstore`, `#/setup/googleplay`)
+Long-form, numbered, with screenshots-free text (kept in `en.json`, source of truth is
+`docs/10-store-setup-guides.md`). Each step has a "done" checkbox persisted in
+`localStorage` so an admin can resume. Ends with the env-var table (name, what to put,
+example), a copyable `.env` block pre-filled with placeholders, and the **Test connection**
+button. See 10-store-setup-guides.md for the content.
 
-## 6. Reviews (`#/reviews`)
-- Filter bar: store, app, rating (1–5 multi), country, date range, replied yes/no, full-text search.
-- Summary strip: count, average, histogram bars (click a bar to filter).
-- List (infinite scroll or paged 50): star rating, title, body (clamped to 3 lines, expand), author, app + version, country flag-as-text code, date, "replied" chip.
+## 5. Dashboard (`#/`)
+Purpose: one glance at how every product is doing, and how platforms compare.
+- **KPI cards** (for filter range, delta vs previous period): Downloads · Updates ·
+  Uninstalls · Crashes · Avg rating · New reviews. Each card shows a small
+  **per-platform split** underneath (e.g. "iOS 1 240 · Android 3 870").
+- **Downloads over time** — line chart. Series = products (when "All products") or
+  platforms (when one product selected). Bucket toggle day / week / month. Legend
+  click toggles series.
+- **Platform share** — donut of downloads by platform for the range.
+- **Crashes over time** — stacked bar by platform.
+- **Ratings** — `rating_total_avg` per product line + star histogram of reviews in range.
+- **Top countries** — horizontal bar, top 10 by downloads.
+- **Products table** — one row per product: icon, name, platform glyphs (dim = missing
+  listing), downloads (range) with per-platform mini-split, Δ%, crashes, rating, last
+  review date. Click → Product detail. Sortable. Unassigned store apps count shown as a
+  warning chip linking to Store apps.
+- **Recent reviews** — last 5 across products, star + first line + platform glyph.
+- **Sync banner** — running sync progress; last run failed → warning link to Sync.
+
+## 6. Products (`#/products`)
+- Card grid or table (toggle): icon, name, platform glyphs with per-platform 30-day
+  downloads and rating, total, last synced.
+- Admin: **New product**, edit (name, icon, description), archive.
+- **Unassigned store apps** section (admin): each with the auto-suggestion
+  ("Looks like *Habit Observer* → Link" / "Create product 'Habit Observer'"), or a
+  product picker. This is the main place the iOS ↔ Android linking happens.
+- Empty state: "No products yet. Run a full sync to discover store apps, then link them here."
+
+## 7. Product detail (`#/products/:slug`)
+- Header: icon, name, **platform chips** (iOS · Android · Windows-greyed "not yet") — each
+  chip links to the store listing and toggles that platform in the filter; description;
+  admin edit / manage links.
+- KPI cards, scoped to the product, each with per-platform split.
+- Tabs (every chart in every tab supports "stacked by platform" / "overlaid by platform" /
+  "total"):
+  - **Overview** — downloads line (per platform), platform share donut, crash rate per
+    1k downloads per platform, rating per platform.
+  - **Downloads** — downloads / redownloads / updates / uninstalls (series toggle) per
+    platform; table by day with platform columns; CSV export.
+  - **Countries** — table + bar of downloads by country, columns per platform.
+  - **Crashes** — crashes (+ ANRs on Android) per platform; crash rate line.
+  - **Ratings** — `rating_total_avg` per platform over time, daily rating count, histogram per platform side by side.
+  - **Reviews** — Reviews list pre-filtered to this product, platform glyph per row.
+  - **Store apps** (admin) — the linked listings with ids, enable toggle, unlink, and
+    "Link another platform" picker for unassigned store apps.
+
+## 8. Store apps (`#/apps`)
+Raw view of what the stores expose, mainly for admins.
+- Table: icon, name, store, platform, store id / package, product (link or
+  "— unassigned —" with suggestion), enabled, first seen, last synced, 30-day downloads.
+- Filters: store, platform, unassigned only; search.
+- Admin: inline enable toggle, edit (name, icon URL), **Link to product** picker,
+  **Create product from this app**.
+
+## 9. Reviews (`#/reviews`)
+- Filter bar: product, platform, rating (1–5 multi), country, date range, replied, full-text search.
+- Summary strip: count, average, histogram (click a bar to filter), per-platform average.
+- List (paged 50): platform glyph, star rating, title, body (clamped to 3 lines, expand),
+  author, product + version, country, date, "replied" chip.
 - Row click → **Review detail** modal: full text, developer reply, metadata, link to store.
 - CSV export of current filter.
 
-## 7. Sync (`#/sync`)
+## 10. Sync (`#/sync`)
 - Two **store cards** (App Store, Google Play):
-  - configured? (green/grey), last run (status, when, duration, rows), next scheduled run.
-  - running: progress bar `apps_done/apps_total`, current step text, elapsed, **Cancel** (admin).
-  - buttons (admin): **Sync now (delta)**, **Full sync…** (confirm dialog explaining duration and that it re-fetches everything), **Reset data…** (type store name to confirm).
-- **Schedule** summary: "Daily at 06:30 Europe/Warsaw · App Store, Google Play" with link to settings.
-- **History** table: started, store, mode, trigger (user name / schedule), status, duration, metrics rows, reviews rows, error snippet; click → run detail.
+  - Not configured → grey card with "Set up App Store Connect →" (to guide).
+  - Configured: last run (status, when, duration, rows), next scheduled run.
+  - Running: progress bar `apps_done/apps_total`, current step, elapsed, **Cancel** (admin).
+  - Buttons (admin): **Sync now (delta)**, **Full sync…** (confirm dialog), **Reset data…**.
+- **Schedule** summary with link to settings.
+- **History** table: started, store, mode, trigger, status, duration, rows, error; click → run detail.
+- After a run that discovered unassigned store apps: notice "3 new store apps need a product → Products".
 
-## 8. Sync run detail (`#/sync/runs/:id`)
+## 11. Sync run detail (`#/sync/runs/:id`)
 - Header with status badge, mode, trigger, range, timing, counters, error.
 - Live-updating log view (polls `/logs?after=`) with level filter; auto-scroll toggle.
-- Per-app breakdown table from `stats` (rows, errors, duration).
+- Per-store-app breakdown table from `stats` (rows, errors, duration).
 
-## 9. Settings – General (`#/settings`)
-- **Automatic sync**: enabled toggle, time picker (HH:MM), stores checkboxes, shows timezone (from env, read-only) and "next run at".
-- **Delta overlap days** (1–14).
-- **Retention** (days, 0 = forever).
-- **Dashboard default range**.
-- **Appearance** (theme) — per browser, not a server setting.
-- Save button, inline validation, toast on success.
+## 12. Settings – General (`#/settings`)
+- **Automatic sync**: enabled, time (HH:MM), stores checkboxes (only configured ones
+  selectable), timezone (read-only), "next run at".
+- **Delta overlap days**, **Retention**, **Dashboard default range**.
+- **Products**: auto-link new store apps by name (toggle).
+- **Appearance** — per browser.
 
-## 10. Settings – Users (`#/settings/users`)
-- Table: name, email, role, TOTP on/off, disabled, last login.
-- Add user dialog (email, name, role, temporary password).
-- Row actions: edit role/name, reset password, disable/enable, delete (guards: not self, not last admin).
+## 13. Settings – Users (`#/settings/users`)
+- Table: name, email, role, TOTP, disabled, last login. Add / edit / reset password /
+  disable / delete with guards (not self, not last admin).
 
-## 11. Settings – Stores (`#/settings/stores`)
-Read-only, because credentials are files/env:
-- Per store: configured ✔/✖, which env vars are set (values masked), key id / issuer id / service-account e-mail / bucket name, "Test connection" button (admin) → calls the store's cheapest endpoint and reports OK / error text.
-- Help text: where to obtain the key, which Play Console permissions to grant.
+## 14. Settings – Stores (`#/settings/stores`)
+Same component as **Setup** (store cards, checks, guides, test connection), embedded in
+the settings layout. This is where an admin adds the second store later.
 
-## 12. My profile (`#/profile`)
-- Name, email (read-only), change password.
-- Two-factor: status; **Enable** → shows QR (rendered client-side from the otpauth URL with a small inline QR generator, no dependency) + manual secret → enter code → show recovery codes once (copy / download). **Disable** asks for password.
+## 15. My profile (`#/profile`)
+- Name, email (read-only), change password, TOTP enable (QR via inline generator) /
+  disable, recovery codes.
 
-## 13. About (modal)
+## 16. About (modal)
 - Version, commit, build time, Go version, link to repo, licence.
 
 ## Components (`src/lib/components`)
-`TopBar`, `FilterBar`, `DateRangePicker`, `KpiCard`, `LineChart`, `BarChart`,
-`Histogram`, `DataTable` (sortable, paged), `StoreBadge`, `Stars`, `ProgressBar`,
-`Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Skeleton`, `LogView`, `Qr`.
+`TopBar`, `FilterBar`, `PlatformToggle`, `PlatformGlyph`, `DateRangePicker`, `KpiCard`
+(with split), `LineChart`, `BarChart`, `Donut`, `Histogram`, `DataTable`, `StoreBadge`,
+`Stars`, `ProgressBar`, `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Skeleton`,
+`LogView`, `Qr`, `StoreCard`, `CheckList`, `GuideStep`, `CopyBlock`, `ProductPicker`.
 
 ## Accessibility & responsiveness
 - Keyboard-navigable tables and dialogs, focus trap in modals, `aria-live` for toasts and sync progress.
-- Below 768 px the top bar collapses to a menu, KPI cards stack, tables scroll horizontally.
+- Below 768 px the top bar collapses, KPI cards stack, tables scroll horizontally.

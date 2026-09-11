@@ -72,10 +72,12 @@ analytics.oxisoft.io {
 
 ## First start
 
-1. `cp .env.example .env`, set `OXI_SESSION_KEY` (`openssl rand -hex 32`), bootstrap admin, store credentials.
-2. Put `AuthKey.p8` and `gplay-sa.json` in `secrets/`.
+1. `cp .env.example .env`, set `OXI_SESSION_KEY` (`openssl rand -hex 32`), bootstrap admin, and credentials for **at least one store** (see 10-store-setup-guides.md — the same text is inside the app).
+2. Put `AuthKey.p8` and/or `gplay-sa.json` in `secrets/`.
 3. `docker compose up -d` → migrations run, admin created, UI at the proxy host.
-4. Log in → Sync → **Full sync** for each store.
+4. Log in. If no store credentials were provided you land on **Setup** with the guides; follow one, restart, **Test connection**.
+5. Sync → **Full sync** for each configured store.
+6. Products → link the discovered iOS/Android store apps into products (or accept the suggestions).
 
 ## Backups
 
