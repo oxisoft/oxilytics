@@ -27,7 +27,7 @@
       push(session.setupRequired ? '/setup' : next());
     } catch (err) {
       if (err instanceof ApiError) {
-        error = err.code === 'rate_limited' ? 'Too many attempts. Wait a minute and try again.' : err.code === 'disabled' ? 'This account is disabled.' : 'Invalid e-mail or password.';
+        error = err.code === 'rate_limited' ? 'Too many attempts. Wait a minute and try again.' : err.code === 'disabled' ? 'This account is disabled.' : err.status === 401 ? 'Invalid e-mail or password.' : `Server error (${err.status}). Try again later.`;
       } else error = 'Network error.';
     } finally { busy = false; }
   }

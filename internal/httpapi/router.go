@@ -40,10 +40,10 @@ func NewRouter(d Deps) http.Handler {
 	a := &API{Deps: d}
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
-	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(d.Auth.Middleware)
+	r.Use(requestLogger)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Use(auth.RequireFetchHeader)

@@ -7,6 +7,6 @@ export default defineConfig({
   build: { outDir: 'dist', emptyOutDir: true, sourcemap: false },
   server: {
     port: 5173,
-    proxy: { '/api': { target: 'http://127.0.0.1:8080', changeOrigin: false } },
+    proxy: { '/api': { target: process.env.OXI_API || 'http://127.0.0.1:8080', changeOrigin: false } },
   },
 });
