@@ -86,7 +86,7 @@ All prefixed `OXI_`. Read once at start; the process refuses to start on invalid
 | `OXI_DB_PATH` | `/data/oxilytics.db` | SQLite file (WAL + shm next to it) |
 | `OXI_SESSION_KEY` | — required | 64 hex chars; cookie auth + encryption key |
 | `OXI_BASE_URL` | `http://localhost:8080` | used for cookie `Secure` flag and links |
-| `OXI_TZ` | `Europe/Warsaw` | timezone for "run at 09:00" and day bucketing in the UI |
+| `OXI_TZ` | `UTC` | timezone for "run at 09:00" and day bucketing in the UI |
 | `OXI_LOG_LEVEL` | `info` | slog level |
 | `OXI_BOOTSTRAP_ADMIN_EMAIL` / `OXI_BOOTSTRAP_ADMIN_PASSWORD` | — | created only when the `users` table is empty |
 | `OXI_ASC_KEY_ID` | — | App Store Connect API key id |

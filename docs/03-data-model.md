@@ -27,7 +27,7 @@ days, RFC 3339 UTC for timestamps). Booleans are `INTEGER 0/1`.
 | column | type | notes |
 |--------|------|-------|
 | id | INTEGER PK | |
-| name | TEXT NOT NULL UNIQUE | "Habit Observer" |
+| name | TEXT NOT NULL UNIQUE | "My Notes" |
 | slug | TEXT NOT NULL UNIQUE | url-safe, used in routes |
 | icon_url | TEXT | falls back to the first linked store app's icon |
 | description | TEXT | |

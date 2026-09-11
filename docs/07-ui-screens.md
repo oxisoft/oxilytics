@@ -5,7 +5,7 @@ charts, svelte-i18n with `en.json`. Dark/light follows `prefers-color-scheme` wi
 manual toggle persisted in `localStorage`. No icon package: the ~20 icons needed
 (incl. platform glyphs for iOS / Android / Windows) are inline SVG components in `src/lib/icons/`.
 
-The UI is **product-centric**: users think in "Habit Observer", not in "bundle id on
+The UI is **product-centric**: users think in "My Notes", not in "bundle id on
 App Store". Platform is a breakdown dimension everywhere, never the primary navigation.
 
 ## Layout
@@ -108,7 +108,7 @@ Purpose: one glance at how every product is doing, and how platforms compare.
   downloads and rating, total, last synced.
 - Admin: **New product**, edit (name, icon, description), archive.
 - **Unassigned store apps** section (admin): each with the suggestion
-  ("Looks like *Habit Observer* → Link" / "Create product 'Habit Observer'"), or a
+  ("Looks like *My Notes* → Link" / "Create product 'My Notes'"), or a
   product picker. Nothing is linked without a click here — this is the one place the
   iOS ↔ Android linking happens.
 - Empty state: "No products yet. Run a full sync to discover store apps, then link them here."

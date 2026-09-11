@@ -1,6 +1,6 @@
 # Oxilytics — project documentation
 
-Oxilytics is OxiSoft's self-hosted analytics dashboard for its own apps. It pulls
+Oxilytics is an open-source (MIT), self-hosted analytics dashboard for app publishers. It pulls
 downloads, ratings, reviews and crash counts from **App Store Connect** and
 **Google Play**, stores them in one SQLite file and shows them in one web UI.
 
@@ -22,7 +22,7 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 ## Decisions already taken
 
 - v1 covers **App Store and Google Play only** (Microsoft Store later).
-- **Products are first-class**: a product (e.g. "Habit Observer") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
+- **Products are first-class**: a product (e.g. "My Notes") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
 - **At least one store must be configured** or the app refuses to do anything except show the setup guide.
 - **Linking is always manual**: sync never auto-links a store app to a product; it only suggests, an admin confirms.
 - **No rating history in v1**: only the current store-wide average/count per store app (refreshed each sync) plus review stars. Daily rating series are v2.
@@ -33,4 +33,4 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 - Store credentials are **mounted files / env vars** — never entered through the UI, never stored in the DB. The UI contains a **setup guide** per store with the exact steps and a connection test.
 - Sync runs in two modes, **full** (from account creation) and **delta** (since last successful run), started **manually from the dashboard** or **once a day at a configurable time**.
 - Charts use **Chart.js** (the only third-party UI dependency); everything else is hand-written Svelte + Tailwind.
-- CI is **GitHub Actions**, images go to **ghcr.io/oxisoft/oxilytics**, UI is **English only** (svelte-i18n is still wired so a second locale is a file drop).
+- CI is **GitHub Actions**, images go to **ghcr.io/oxisoft/oxilytics** (the repo's owner namespace; forks build their own), UI is **English only** (svelte-i18n is still wired so a second locale is a file drop).

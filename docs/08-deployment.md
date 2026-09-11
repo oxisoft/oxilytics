@@ -65,7 +65,7 @@ services:
 
 Reverse proxy: `deploy/Caddyfile.example`:
 ```
-analytics.oxisoft.io {
+analytics.example.com {
     reverse_proxy 127.0.0.1:8080
 }
 ```

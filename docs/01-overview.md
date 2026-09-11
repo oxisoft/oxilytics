@@ -2,7 +2,7 @@
 
 ## Goal
 
-Give OxiSoft one place to see how its apps perform across stores, without depending on
+Give an app publisher one place to see how their apps perform across stores, without depending on
 each store's console, and keep the history for as long as we want (stores keep it for a
 limited time: Google Play CSVs go back to the account start, but App Store *Sales* daily
 reports are only kept for ~1 year, and Google Play `reviews.list` returns only the last 7 days).
@@ -50,7 +50,7 @@ The first admin is bootstrapped from env vars on first start (see 08-deployment)
 ## Glossary
 
 - **Store** — `appstore` or `googleplay`.
-- **Product** — what OxiSoft ships ("Habit Observer"). Owns one **store app** per platform. All dashboards are product-centric.
+- **Product** — what the publisher ships ("My Notes"). Owns one **store app** per platform. All dashboards are product-centric.
 - **Store app** — one listing on one store (`appstore`/ios, `googleplay`/android, later `msstore`/windows). Belongs to at most one product; unlinked store apps are shown in an "Unassigned" bucket until an admin links them or accepts the auto-suggested match.
 - **Platform** — `ios`, `macos`, `android`, `windows`; derived from the store app, used as the breakdown dimension. An App Store listing that ships iOS and macOS under one id is `ios`; a macOS-only listing is `macos`.
 - **Sync run** — one execution of the sync for one store, in mode `full` or `delta`.

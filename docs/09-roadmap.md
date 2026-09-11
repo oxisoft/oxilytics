@@ -37,13 +37,13 @@ Each milestone ends with `go vet`, `go test`, `npm run build` green and a runnab
 
 ### M6 — Release 1.0 (1–2 days)
 - Multi-arch image workflow on tags, README with setup guide, `.env.example`, Caddyfile example.
-- Run a real full sync against OxiSoft's accounts, link Habit Observer iOS+Android manually, fix parser gaps, tag `v1.0.0`.
+- Run a real full sync against a real publisher account on both stores, link one product's iOS+Android listings manually, fix parser gaps, tag `v1.0.0`.
 
 Total ≈ 3 weeks of focused work.
 
 ## Definition of done (v1)
-- Full sync of both stores completes on real OxiSoft accounts and the dashboard numbers match the store consoles for a sampled week (±1 day lag).
-- Habit Observer (iOS + Android) shows as one product with correct per-platform and combined totals.
+- Full sync of both stores completes on real publisher accounts and the dashboard numbers match the store consoles for a sampled week (±1 day lag).
+- A product with iOS + Android listings shows as one product with correct per-platform and combined totals.
 - A fresh container with no credentials shows the Setup screen; following the in-app guide for either store alone is enough to reach a successful full sync.
 - Daily scheduled delta runs for 7 consecutive days without manual intervention.
 - Container restarts mid-sync leave the DB consistent and the run marked `interrupted`.
