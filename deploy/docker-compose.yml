@@ -13,5 +13,7 @@ services:
       OXI_ASC_KEY_FILE: /secrets/AuthKey.p8
       OXI_GPLAY_SA_FILE: /secrets/gplay-sa.json
     volumes:
+      # the container runs as uid 65532 (distroless nonroot):
+      #   mkdir -p data secrets && sudo chown -R 65532:65532 data
       - ./data:/data
       - ./secrets:/secrets:ro

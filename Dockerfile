@@ -19,10 +19,13 @@ COPY --from=web /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -trimpath \
     -ldflags "-s -w -X github.com/oxisoft/oxilytics/internal/version.Version=${VERSION} -X github.com/oxisoft/oxilytics/internal/version.Commit=${COMMIT} -X github.com/oxisoft/oxilytics/internal/version.BuildTime=${BUILD_TIME}" \
     -o /oxilytics ./cmd/server
+# /data must be writable by nonroot (uid 65532); named volumes inherit these perms
+RUN mkdir -p /data /data/backups && chown -R 65532:65532 /data
 
 # 3. runtime
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /oxilytics /oxilytics
+COPY --from=build --chown=65532:65532 /data /data
 USER nonroot
 VOLUME ["/data"]
 EXPOSE 8080
