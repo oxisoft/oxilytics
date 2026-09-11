@@ -1,0 +1,21 @@
+# build output
+/bin/
+/web/dist/*
+!/web/dist/index.html
+/web/node_modules/
+
+# local dev
+/dev.db*
+/dev-backups/
+/deploy/data/
+/deploy/secrets/
+/deploy/.env
+*.p8
+*.pem
+gplay-sa.json
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

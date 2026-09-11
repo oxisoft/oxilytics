@@ -1,0 +1,17 @@
+services:
+  oxilytics:
+    image: ghcr.io/oxisoft/oxilytics:latest
+    # build: ..            # uncomment to build from source instead of pulling
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"   # only the reverse proxy on this host reaches it
+    env_file: .env
+    environment:
+      OXI_ADDR: 0.0.0.0:8080
+      OXI_DB_PATH: /data/oxilytics.db
+      OXI_BACKUP_DIR: /data/backups
+      OXI_ASC_KEY_FILE: /secrets/AuthKey.p8
+      OXI_GPLAY_SA_FILE: /secrets/gplay-sa.json
+    volumes:
+      - ./data:/data
+      - ./secrets:/secrets:ro
