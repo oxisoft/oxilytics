@@ -31,14 +31,14 @@ queued ──▶ running ──▶ succeeded
 
 ## Steps of a run
 
-1. Load enabled store apps for the store (full mode also refreshes the catalogue first and inserts new apps). New store apps go through `products.Link`: exact normalised-name match to an existing product → linked (if `products.auto_link`), fuzzy match → `suggested_product_id`, none → unassigned. The run log and the Products screen surface unassigned apps.
+1. Load enabled store apps for the store (full mode also refreshes the catalogue first and inserts new apps). New store apps are **never linked automatically**: if `products.suggest` is on, a normalised-name match sets `suggested_product_id`; the app stays unassigned until an admin confirms on the Products screen. The run summary and the Sync screen flag unassigned apps.
 2. For each app (sequentially — the stores rate-limit per account, not per app):
    1. metrics (downloads/installs/uninstalls)
    2. crashes
-   3. ratings
-   4. reviews
+   3. reviews
+   4. rating snapshot (`apps.rating_avg/count`)
    Each step: fetch → parse → upsert in one transaction per (app, source, month) → advance checkpoint → log.
-3. Refresh totals (`rating_total_*`, `apps.last_synced_at`).
+3. Set `apps.last_synced_at`.
 4. Mark run finished, write `stats` JSON.
 
 A step failure for one app is logged and the run continues; the run ends `failed` only

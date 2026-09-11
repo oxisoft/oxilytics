@@ -14,7 +14,7 @@ reports are only kept for ~1 year, and Google Play `reviews.list` returns only t
 | App catalogue (name, id, icon, platform) | `GET /v1/apps` + iTunes lookup | package list from bucket file names + Android Publisher `edits.listings` / `edits.images` |
 | Downloads / installs per day, per country | Analytics Reports API (`App Store Downloads` / `App Store Installation and Deletion`) | `stats/installs/*_overview.csv` and `*_country.csv` |
 | Updates, uninstalls/deletions | same reports | same CSVs |
-| Ratings: daily average, count | derived from reviews + iTunes lookup for the store-wide average | `stats/ratings/*_overview.csv` (`Daily Average Rating`, `Total Average Rating`) |
+| Rating: current store-wide average + count (snapshot per sync, no history) | iTunes lookup (`averageUserRating`, `userRatingCount`) | `stats/ratings/*_overview.csv` latest `Total Average Rating` |
 | Reviews (text, stars, author, version, country, date) | `GET /v1/apps/{id}/customerReviews` | `reviews/reviews_*.csv` (history) + `reviews.list` (last 7 days) |
 | Crashes per day | Analytics Reports API (`App Crashes`) | `stats/crashes/*_overview.csv` |
 
@@ -23,6 +23,8 @@ Everything is **read-only** against the stores. v1 does not reply to reviews.
 ## Non-goals (v1)
 
 - Revenue, proceeds, subscriptions, in-app purchases.
+- Rating **history** (daily average / count series). v1 stores only the current snapshot.
+- Single-app sync; sync always covers a whole store.
 - Microsoft Store / Partner Center.
 - Multi-tenant (several companies) — one workspace only.
 - Push notifications / e-mail alerts (a "review below 3★" alert is a v2 candidate).
@@ -50,7 +52,7 @@ The first admin is bootstrapped from env vars on first start (see 08-deployment)
 - **Store** — `appstore` or `googleplay`.
 - **Product** — what OxiSoft ships ("Habit Observer"). Owns one **store app** per platform. All dashboards are product-centric.
 - **Store app** — one listing on one store (`appstore`/ios, `googleplay`/android, later `msstore`/windows). Belongs to at most one product; unlinked store apps are shown in an "Unassigned" bucket until an admin links them or accepts the auto-suggested match.
-- **Platform** — `ios`, `macos`, `android`, `windows`; derived from the store app, used as the breakdown dimension.
+- **Platform** — `ios`, `macos`, `android`, `windows`; derived from the store app, used as the breakdown dimension. An App Store listing that ships iOS and macOS under one id is `ios`; a macOS-only listing is `macos`.
 - **Sync run** — one execution of the sync for one store, in mode `full` or `delta`.
 - **Checkpoint** — per (store, source) marker of what has been ingested, used by delta runs.
 - **Metric day** — one row per (app, date, country) with counters.

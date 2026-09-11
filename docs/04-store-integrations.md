@@ -44,9 +44,8 @@ Quirks:
 - Rate limit is per key, roughly 3 600 requests/hour; the client throttles to 1 req/s.
 
 ### Ratings
-Apple has no historical rating endpoint. We store:
-- daily `rating_avg` / `rating_count` computed from reviews created that day (approximation, reviews ≠ ratings), and
-- `rating_total_avg` / `rating_total_count` from the iTunes lookup, sampled once per run for the storefronts listed in setting `appstore.rating_countries` (default `us,gb,de,pl`) plus `*` = `us`.
+Apple has no historical rating endpoint and v1 needs none. Once per run the iTunes
+lookup (`country=us`) fills `apps.rating_avg` / `rating_count` — a snapshot, overwritten each time.
 
 ## Google Play
 
@@ -62,15 +61,14 @@ Apple has no historical rating endpoint. We store:
 |--------|------|--------------|
 | `stats/installs/` | `installs_{pkg}_{YYYYMM}_overview.csv` | Date, Daily Device Installs, Daily Device Uninstalls, Daily Device Upgrades, Daily User Installs, Daily User Uninstalls, Active Device Installs |
 | `stats/installs/` | `installs_{pkg}_{YYYYMM}_country.csv` | same + Country |
-| `stats/ratings/` | `ratings_{pkg}_{YYYYMM}_overview.csv` | Date, Daily Average Rating, Total Average Rating |
-| `stats/ratings/` | `ratings_{pkg}_{YYYYMM}_country.csv` | + Country |
+| `stats/ratings/` | `ratings_{pkg}_{YYYYMM}_overview.csv` | only the last row's `Total Average Rating` → `apps.rating_avg` (snapshot; no history in v1) |
 | `stats/crashes/` | `crashes_{pkg}_{YYYYMM}_overview.csv` | Date, Daily Crashes, Daily ANRs |
 | `reviews/` | `reviews_{pkg}_{YYYYMM}.csv` | Package Name, App Version Code/Name, Reviewer Language, Device, Review Submit Date and Time, Star Rating, Review Title, Review Text, Developer Reply Date and Time, Developer Reply Text, Review Link |
 
 Quirks:
 - Files are **UTF-16 LE with BOM**, comma-separated; the client transcodes.
 - The current month's file is rewritten daily; Google also restates the last few days. Delta re-downloads the current and previous month regardless of `generation`, older months only if `generation` changed (`ingested_objects`).
-- Ratings count per day is not in the CSV; `rating_count` on Android is derived from reviews (approximate) and `rating_total_count` from `androidpublisher` is not available → left NULL. The dashboard shows "Total average" only.
+- Google exposes no total ratings count through reports or API → `apps.rating_count` stays NULL on Android; the UI shows the average only.
 - Package list = distinct `{pkg}` in file names. Display name and icon are read through the Android Publisher API: `edits.insert` → `edits.listings.get(defaultLanguage)` → `title`, then `edits.images.list(icon)` → URL, then `edits.delete`. Clumsy but official and cheap (once per full sync). If it fails, the store app is created with the package name as name and the admin can override it in the Apps screen.
 
 ### Reviews API
@@ -89,5 +87,4 @@ it to get today's reviews immediately; the monthly CSV fills history and edits.
 | active_devices | — | `Active Device Installs` |
 | crashes | `App Crashes`.`Crashes` | `Daily Crashes` |
 | anrs | — | `Daily ANRs` |
-| rating_avg / count | from reviews of that day | `Daily Average Rating` / from reviews |
-| rating_total_* | iTunes lookup | `Total Average Rating` / NULL |
+| apps.rating_avg / rating_count (snapshot) | iTunes lookup | latest `Total Average Rating` / NULL |

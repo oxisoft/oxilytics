@@ -24,6 +24,10 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 - v1 covers **App Store and Google Play only** (Microsoft Store later).
 - **Products are first-class**: a product (e.g. "Habit Observer") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
 - **At least one store must be configured** or the app refuses to do anything except show the setup guide.
+- **Linking is always manual**: sync never auto-links a store app to a product; it only suggests, an admin confirms.
+- **No rating history in v1**: only the current store-wide average/count per store app (refreshed each sync) plus review stars. Daily rating series are v2.
+- An App Store listing covering iOS+macOS is platform `ios`; macOS-only is `macos`.
+- No single-app sync in v1; stores sync in parallel, one run per store.
 - v1 data: **downloads/installs, ratings & reviews, crashes**. No revenue, no subscriptions.
 - **Single workspace**, several users with roles `admin` / `viewer`.
 - Store credentials are **mounted files / env vars** — never entered through the UI, never stored in the DB. The UI contains a **setup guide** per store with the exact steps and a connection test.

@@ -94,7 +94,7 @@ Purpose: one glance at how every product is doing, and how platforms compare.
   click toggles series.
 - **Platform share** — donut of downloads by platform for the range.
 - **Crashes over time** — stacked bar by platform.
-- **Ratings** — `rating_total_avg` per product line + star histogram of reviews in range.
+- **Ratings** — current rating per product/platform (big number + stars) + star histogram of reviews in range. No rating-over-time chart in v1.
 - **Top countries** — horizontal bar, top 10 by downloads.
 - **Products table** — one row per product: icon, name, platform glyphs (dim = missing
   listing), downloads (range) with per-platform mini-split, Δ%, crashes, rating, last
@@ -107,25 +107,26 @@ Purpose: one glance at how every product is doing, and how platforms compare.
 - Card grid or table (toggle): icon, name, platform glyphs with per-platform 30-day
   downloads and rating, total, last synced.
 - Admin: **New product**, edit (name, icon, description), archive.
-- **Unassigned store apps** section (admin): each with the auto-suggestion
+- **Unassigned store apps** section (admin): each with the suggestion
   ("Looks like *Habit Observer* → Link" / "Create product 'Habit Observer'"), or a
-  product picker. This is the main place the iOS ↔ Android linking happens.
+  product picker. Nothing is linked without a click here — this is the one place the
+  iOS ↔ Android linking happens.
 - Empty state: "No products yet. Run a full sync to discover store apps, then link them here."
 
 ## 7. Product detail (`#/products/:slug`)
 - Header: icon, name, **platform chips** (iOS · Android · Windows-greyed "not yet") — each
-  chip links to the store listing and toggles that platform in the filter; description;
-  admin edit / manage links.
+  chip links to the store listing and toggles that platform in the filter; current
+  rating per platform; description; admin edit / manage links.
 - KPI cards, scoped to the product, each with per-platform split.
 - Tabs (every chart in every tab supports "stacked by platform" / "overlaid by platform" /
   "total"):
   - **Overview** — downloads line (per platform), platform share donut, crash rate per
-    1k downloads per platform, rating per platform.
+    1k downloads per platform.
   - **Downloads** — downloads / redownloads / updates / uninstalls (series toggle) per
     platform; table by day with platform columns; CSV export.
   - **Countries** — table + bar of downloads by country, columns per platform.
   - **Crashes** — crashes (+ ANRs on Android) per platform; crash rate line.
-  - **Ratings** — `rating_total_avg` per platform over time, daily rating count, histogram per platform side by side.
+  - **Ratings** — current rating & count per platform, review-star histogram per platform side by side (from reviews in range).
   - **Reviews** — Reviews list pre-filtered to this product, platform glyph per row.
   - **Store apps** (admin) — the linked listings with ids, enable toggle, unlink, and
     "Link another platform" picker for unassigned store apps.
@@ -165,7 +166,7 @@ Raw view of what the stores expose, mainly for admins.
 - **Automatic sync**: enabled, time (HH:MM), stores checkboxes (only configured ones
   selectable), timezone (read-only), "next run at".
 - **Delta overlap days**, **Retention**, **Dashboard default range**.
-- **Products**: auto-link new store apps by name (toggle).
+- **Products**: suggest a product for new store apps by name (toggle; linking itself is always manual).
 - **Appearance** — per browser.
 
 ## 13. Settings – Users (`#/settings/users`)

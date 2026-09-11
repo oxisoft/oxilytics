@@ -51,6 +51,9 @@ A product has **at most one store app per platform** (enforced by a unique index
 | product_id | INTEGER FK products NULL | NULL = unassigned |
 | suggested_product_id | INTEGER FK products NULL | auto-match suggestion awaiting admin confirmation |
 | enabled | INTEGER NOT NULL DEFAULT 1 | disabled apps are skipped by sync and hidden by default |
+| rating_avg | REAL | current store-wide average, refreshed each sync (Apple: iTunes lookup; Google: latest `Total Average Rating`) |
+| rating_count | INTEGER | Apple only (`userRatingCount`); NULL on Google |
+| rating_updated_at | TEXT | |
 | first_seen_at, last_synced_at | TEXT | |
 | UNIQUE(store, store_app_id) | | |
 | UNIQUE(product_id, platform) WHERE product_id IS NOT NULL | | |
@@ -78,10 +81,6 @@ exact even where the per-country data is sampled or missing.
 | active_devices | INTEGER | Google `Active Device Installs` (snapshot, not summable) |
 | crashes | INTEGER | Apple `App Crashes` count; Google `Daily Crashes` |
 | anrs | INTEGER | Google only |
-| rating_avg | REAL | Google daily average; Apple: average of that day's reviews |
-| rating_count | INTEGER | number of ratings that day |
-| rating_total_avg | REAL | Google `Total Average Rating`; Apple from iTunes lookup |
-| rating_total_count | INTEGER | |
 | source_updated_at | TEXT | when the store file/report was produced |
 | PRIMARY KEY (app_id, day, country) | | |
 
@@ -137,7 +136,7 @@ Per (store, source, app) "what have I already got".
 
 | column | notes |
 |--------|-------|
-| store, source, app_id | PK; `source` ∈ `metrics`, `reviews`, `crashes`, `ratings` |
+| store, source, app_id | PK; `source` ∈ `metrics`, `reviews`, `crashes` |
 | cursor | TEXT: last day ingested (`YYYY-MM-DD`), or last review timestamp / GCS object generation |
 | updated_at | |
 

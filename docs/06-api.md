@@ -40,7 +40,7 @@ When `setup_required` is true every other data/sync endpoint returns `503 {"erro
 | DELETE | `/products/{id}` | admin | only when no store apps linked |
 | POST | `/products/{id}/apps` | admin | `{app_id}` link; `409 platform_taken` if the product already has that platform |
 | DELETE | `/products/{id}/apps/{app_id}` | admin | unlink → store app becomes unassigned |
-| GET | `/products/suggestions` | admin | unassigned store apps with `suggested_product_id` or a proposed new product name |
+| GET | `/products/suggestions` | admin | unassigned store apps with `suggested_product_id` (if any) or a proposed new product name; nothing is linked until accepted |
 | POST | `/products/suggestions/accept` | admin | `{app_id, product_id?}` — link to existing or create product from the app's name |
 
 ## Store apps
@@ -58,7 +58,7 @@ All metric endpoints accept the same scope filters: `product_id`, `platform`, `s
 | GET | `/metrics/products?from=&to=` | any | one row per product: totals + per-platform split (feeds the dashboard table) |
 | GET | `/metrics/export.csv?…` | any | same filters, CSV download |
 
-`metric` ∈ `downloads, redownloads, updates, uninstalls, active_devices, crashes, anrs, rating_avg, rating_count`.
+`metric` ∈ `downloads, redownloads, updates, uninstalls, active_devices, crashes, anrs`. Ratings are not a time series in v1; the current per-app snapshot comes with `/apps` and `/products`.
 
 ## Reviews
 | GET | `/reviews?product_id=&platform=&store=&app_id=&rating=&from=&to=&q=&country=&replied=&page=&per_page=` | any | paginated, newest first; `q` uses FTS |

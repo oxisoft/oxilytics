@@ -23,7 +23,7 @@ Each milestone ends with `go vet`, `go test`, `npm run build` green and a runnab
 
 ### M3 — Sync engine (3–4 days)
 - Migrations: products, apps, metric_days, reviews (+FTS), sync_runs, sync_run_logs, sync_checkpoints, ingested_objects.
-- `internal/products`: CRUD, link/unlink with one-platform-per-product rule, name-normalised auto-link and fuzzy suggestions (tests).
+- `internal/products`: CRUD, link/unlink with one-platform-per-product rule, name-normalised suggestions (never auto-link) (tests).
 - Engine: run lifecycle, per-store mutex, cancellation, progress, logs, checkpoints, full & delta for both stores, interrupted-run recovery.
 - Scheduler (cron) driven by settings; backup + retention job.
 - API: `/sync/*`, `/settings`. Screens: Sync, Sync run detail, Settings–General.
@@ -37,7 +37,7 @@ Each milestone ends with `go vet`, `go test`, `npm run build` green and a runnab
 
 ### M6 — Release 1.0 (1–2 days)
 - Multi-arch image workflow on tags, README with setup guide, `.env.example`, Caddyfile example.
-- Run a real full sync against OxiSoft's accounts, fix parser gaps, tag `v1.0.0`.
+- Run a real full sync against OxiSoft's accounts, link Habit Observer iOS+Android manually, fix parser gaps, tag `v1.0.0`.
 
 Total ≈ 3 weeks of focused work.
 
@@ -49,10 +49,11 @@ Total ≈ 3 weeks of focused work.
 - Container restarts mid-sync leave the DB consistent and the run marked `interrupted`.
 - `go test -race` and frontend build are green in CI; image runs as non-root on amd64 and arm64.
 
-## Open questions (need a decision)
-1. **Apple ratings history** — approximated from reviews. Acceptable, or should we sample the iTunes lookup daily per country and store it as a proper time series (`rating_total_*` per country)? Recommendation: do the daily sampling; it's cheap.
-2. **Product auto-link threshold** — exact normalised-name match auto-links; fuzzy (e.g. "Habit Observer" vs "Habit Observer – Tracker") only suggests. OK, or always require confirmation?
-3. **macOS listings** — an App Store Connect app can be iOS+macOS under one id; v1 treats it as platform `ios` unless it is macOS-only. Fine for now?
-4. **Single-app sync** ("Sync this app" button) — nice-to-have; drop from v1 if time is short.
-5. **Alerts** (rating drop, crash spike, new 1★ review) via e-mail/Telegram — v2.
-6. **Microsoft Store** — v2; the store abstraction (`store` column, per-store client + ingester) is designed so it's additive.
+## Decisions (formerly open questions)
+1. **Rating history** — not in v1. Only a current snapshot per store app (`apps.rating_avg/count`). Daily rating series is a v2 item.
+2. **Product linking** — always manual. Sync only attaches a name-based suggestion; an admin confirms on the Products screen.
+3. **iOS + macOS under one App Store id** — platform `ios`; macOS-only listing → `macos`.
+4. **Single-app sync** — dropped from v1.
+5. **Concurrency** — stores sync in parallel, at most one run per store.
+6. **Alerts** (rating drop, crash spike, new 1★ review) — v2.
+7. **Microsoft Store** — v2; the store/platform abstraction is additive.

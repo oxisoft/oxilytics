@@ -119,7 +119,7 @@ Editable by admins in the UI, applied without restart:
 | `sync.delta.overlap_days` | `3` | delta runs re-fetch this many days back (stores restate recent days) |
 | `metrics.retention_days` | `0` | 0 = keep forever |
 | `ui.default_range_days` | `30` | initial dashboard range |
-| `products.auto_link` | `true` | when sync discovers a new store app, auto-link it to a product whose normalised name matches exactly; otherwise leave unassigned with a suggestion |
+| `products.suggest` | `true` | when sync discovers a new store app, attach a suggested product (normalised-name match) for the admin to confirm; never links automatically |
 
 ## Auth
 
