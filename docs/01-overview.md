@@ -1,0 +1,45 @@
+# 01 — Overview
+
+## Goal
+
+Give OxiSoft one place to see how its apps perform across stores, without depending on
+each store's console, and keep the history for as long as we want (stores keep it for a
+limited time: Google Play CSVs go back to the account start, but App Store *Sales* daily
+reports are only kept for ~1 year, and Google Play `reviews.list` returns only the last 7 days).
+
+## Scope of v1
+
+| Area | App Store Connect | Google Play |
+|------|-------------------|-------------|
+| App catalogue (name, id, icon, platform) | `GET /v1/apps` | package list from bucket file names + `edits`/`applications` details |
+| Downloads / installs per day, per country | Analytics Reports API (`App Store Downloads` / `App Store Installation and Deletion`) | `stats/installs/*_overview.csv` and `*_country.csv` |
+| Updates, uninstalls/deletions | same reports | same CSVs |
+| Ratings: daily average, count | derived from reviews + iTunes lookup for the store-wide average | `stats/ratings/*_overview.csv` (`Daily Average Rating`, `Total Average Rating`) |
+| Reviews (text, stars, author, version, country, date) | `GET /v1/apps/{id}/customerReviews` | `reviews/reviews_*.csv` (history) + `reviews.list` (last 7 days) |
+| Crashes per day | Analytics Reports API (`App Crashes`) | `stats/crashes/*_overview.csv` |
+
+Everything is **read-only** against the stores. v1 does not reply to reviews.
+
+## Non-goals (v1)
+
+- Revenue, proceeds, subscriptions, in-app purchases.
+- Microsoft Store / Partner Center.
+- Multi-tenant (several companies) — one workspace only.
+- Push notifications / e-mail alerts (a "review below 3★" alert is a v2 candidate).
+- Editing anything on the stores.
+- Mobile app; the SPA is responsive, that is enough.
+
+## Users
+
+- **admin** — everything: users, settings, run sync, view data.
+- **viewer** — view dashboard, apps, reviews, sync status. Cannot run sync or change settings.
+
+The first admin is bootstrapped from env vars on first start (see 08-deployment).
+
+## Glossary
+
+- **Store** — `appstore` or `googleplay`.
+- **App** — one store listing. The same product on both stores is two `app` rows linked by an optional `product_key` so the dashboard can show them together.
+- **Sync run** — one execution of the sync for one store, in mode `full` or `delta`.
+- **Checkpoint** — per (store, source) marker of what has been ingested, used by delta runs.
+- **Metric day** — one row per (app, date, country) with counters.
