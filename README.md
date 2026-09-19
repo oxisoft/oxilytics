@@ -1,4 +1,4 @@
-# Oxilytics
+# OxiLytics
 
 Self-hosted analytics for app publishers. One Go binary, one SQLite file, one
 Docker image. Pulls downloads, updates, uninstalls, crashes, ratings and reviews
