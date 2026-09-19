@@ -8,7 +8,10 @@
   <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1">
     <a href="/about" use:link class="hover:underline">OxiLytics {session.version?.version || ''}{#if session.version?.short_commit && session.version.commit !== 'none' && !session.version.version?.includes(session.version.short_commit.replace('-dirty', ''))}{' (' + session.version.short_commit + ')'}{/if}</a>
     {#if session.version?.build_time && session.version.build_time !== 'unknown'}<span>built {fmtDateTime(session.version.build_time)}</span>{/if}
-    <a class="ml-auto hover:underline" href="https://github.com/oxisoft/oxilytics" target="_blank" rel="noreferrer">GitHub</a>
+    <span class="ml-auto">
+      by <a href="https://oxisoft.io" target="_blank" rel="noreferrer" class="font-medium hover:underline">OxiSoft</a>
+    </span>
+    <a class="hover:underline" href="https://github.com/oxisoft/oxilytics" target="_blank" rel="noreferrer">Source on GitHub</a>
     <span>MIT</span>
   </div>
 </footer>
