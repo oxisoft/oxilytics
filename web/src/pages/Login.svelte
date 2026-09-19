@@ -35,7 +35,7 @@
 
 <div class="mx-auto mt-16 max-w-sm">
   <div class="mb-6 flex items-center justify-center gap-2 text-xl font-semibold">
-    <span class="grid h-9 w-9 place-items-center rounded-md bg-brand-600 text-white"><Icon name="dashboard" class="h-5 w-5" /></span>Oxilytics
+    <span class="grid h-9 w-9 place-items-center rounded-md bg-brand-600 text-white"><Icon name="dashboard" class="h-5 w-5" /></span>OxiLytics
   </div>
   <form class="card space-y-4" onsubmit={submit}>
     <div>
@@ -50,6 +50,6 @@
     <button class="btn-primary w-full justify-center" disabled={busy}>Sign in</button>
   </form>
   <p class="mt-4 text-center text-xs text-zinc-400">
-    Oxilytics {session.version?.version || ''}{#if session.version?.short_commit && session.version.commit !== 'none' && !session.version.version?.includes(session.version.short_commit.replace('-dirty', ''))}{' · ' + session.version.short_commit}{/if}
+    OxiLytics {session.version?.version || ''}{#if session.version?.short_commit && session.version.commit !== 'none' && !session.version.version?.includes(session.version.short_commit.replace('-dirty', ''))}{' · ' + session.version.short_commit}{/if}
   </p>
 </div>

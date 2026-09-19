@@ -28,7 +28,7 @@ OXI_GPLAY_BUCKET=
 
 {#if status?.setup_required}
   <div class="mb-4">
-    <Banner kind="warn" message="Oxilytics needs access to at least one store. Configure App Store Connect or Google Play below, restart the container, then run a full sync." />
+    <Banner kind="warn" message="OxiLytics needs access to at least one store. Configure App Store Connect or Google Play below, restart the container, then run a full sync." />
   </div>
 {:else if status}
   <p class="mb-4 text-sm text-zinc-500">Credentials live in environment variables and mounted files, never in the database. Add a second store any time.</p>

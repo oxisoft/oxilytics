@@ -12,7 +12,7 @@ App Store". Platform is a breakdown dimension everywhere, never the primary navi
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│ ◈ Oxilytics   Dashboard  Products  Reviews  Sync  [Settings]   ● me │  top bar (Settings admin-only)
+│ ◈ OxiLytics   Dashboard  Products  Reviews  Sync  [Settings]   ● me │  top bar (Settings admin-only)
 ├────────────────────────────────────────────────────────────────────┤
 │  [filter bar:  product ▾ | platform: All ▢iOS ▢Android | range ▾ ] │  on data screens
 │                                                                     │
@@ -68,7 +68,7 @@ Shown as the landing page when **no store is configured**; also reachable any ti
 Settings → Stores. Purpose: get an admin from "fresh container" to "first sync" without
 reading external docs.
 
-- Banner: "Oxilytics needs access to at least one store. Configure App Store Connect or
+- Banner: "OxiLytics needs access to at least one store. Configure App Store Connect or
   Google Play below, restart the container, then run a full sync."
 - Two **store cards**, each with: status (Not configured / Configured ✔ / Error ✖ with
   the failing check), the list of checks from `/setup/status` (env var set → file found →

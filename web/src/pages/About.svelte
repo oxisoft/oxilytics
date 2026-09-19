@@ -9,7 +9,7 @@
   <div class="mb-6 flex items-center gap-3">
     <span class="grid h-12 w-12 place-items-center rounded-xl bg-brand-600 text-white"><Icon name="dashboard" class="h-6 w-6" /></span>
     <div>
-      <h1 class="text-xl font-semibold">Oxilytics</h1>
+      <h1 class="text-xl font-semibold">OxiLytics</h1>
       <p class="text-sm text-zinc-500">Self-hosted app store analytics</p>
     </div>
   </div>

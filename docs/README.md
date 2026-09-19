@@ -1,6 +1,6 @@
-# Oxilytics — project documentation
+# OxiLytics — project documentation
 
-Oxilytics is an open-source (MIT), self-hosted analytics dashboard for app publishers. It pulls
+OxiLytics is an open-source (MIT), self-hosted analytics dashboard for app publishers. It pulls
 downloads, ratings, reviews and crash counts from **App Store Connect** and
 **Google Play**, stores them in one SQLite file and shows them in one web UI.
 

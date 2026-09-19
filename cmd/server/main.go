@@ -1,4 +1,4 @@
-// Command server is the Oxilytics binary: config → DB → migrations → services → HTTP.
+// Command server is the OxiLytics binary: config → DB → migrations → services → HTTP.
 package main
 
 import (
@@ -78,7 +78,7 @@ func run() error {
 		slog.Warn("no store configured — running in setup mode; open the UI and follow the guide")
 	}
 
-	authSvc := auth.New(db, cfg.SessionKey, cfg.Secure, "Oxilytics")
+	authSvc := auth.New(db, cfg.SessionKey, cfg.Secure, "OxiLytics")
 	settingsSvc := settings.New(db)
 
 	// sync engine with whichever store clients are configured

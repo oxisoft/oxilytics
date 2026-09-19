@@ -32,7 +32,7 @@
   <div class="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
     <a href="/" use:link class="flex items-center gap-2 font-semibold">
       <span class="grid h-7 w-7 place-items-center rounded-md bg-brand-600 text-white"><Icon name="dashboard" class="h-4 w-4" /></span>
-      Oxilytics
+      OxiLytics
     </a>
 
     <nav class="hidden items-center gap-1 md:flex" aria-label="Main">
