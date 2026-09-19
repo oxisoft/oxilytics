@@ -52,4 +52,9 @@
   <p class="mt-4 text-center text-xs text-zinc-400">
     OxiLytics {session.version?.version || ''}{#if session.version?.short_commit && session.version.commit !== 'none' && !session.version.version?.includes(session.version.short_commit.replace('-dirty', ''))}{' · ' + session.version.short_commit}{/if}
   </p>
+  <p class="mt-1 text-center text-xs text-zinc-400">
+    by <a href="https://oxisoft.io" target="_blank" rel="noreferrer" class="font-medium hover:underline">OxiSoft</a>
+    · <a href="https://github.com/oxisoft/oxilytics" target="_blank" rel="noreferrer" class="hover:underline">Source on GitHub</a>
+    · MIT
+  </p>
 </div>

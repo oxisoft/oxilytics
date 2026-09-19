@@ -32,6 +32,7 @@
   <div class="card mt-4 text-sm">
     <h2 class="mb-2 font-medium">Links</h2>
     <ul class="space-y-1">
+      <li><a class="flex items-center gap-2 hover:underline" href="https://oxisoft.io" target="_blank" rel="noreferrer"><Icon name="external" />Developed by OxiSoft</a></li>
       <li><a class="flex items-center gap-2 hover:underline" href="https://github.com/oxisoft/oxilytics" target="_blank" rel="noreferrer"><Icon name="external" />Source on GitHub</a></li>
       <li><a class="flex items-center gap-2 hover:underline" href="https://github.com/oxisoft/oxilytics/releases" target="_blank" rel="noreferrer"><Icon name="external" />Releases &amp; changelog</a></li>
       <li><a class="flex items-center gap-2 hover:underline" href="https://github.com/oxisoft/oxilytics/issues" target="_blank" rel="noreferrer"><Icon name="external" />Report an issue</a></li>
