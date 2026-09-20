@@ -38,17 +38,25 @@ type Client interface {
 
 type Ingester struct {
 	c Client
-	// SnapshotWait bounds how long a full run waits for Apple to produce a
-	// ONE_TIME_SNAPSHOT before giving up on that app for this run.
-	SnapshotWait time.Duration
-	PollEvery    time.Duration
+	// SnapshotGrace is a short courtesy wait for a ONE_TIME_SNAPSHOT that Apple
+	// might produce immediately. It is deliberately small: the request id is
+	// persisted, so an unready snapshot is picked up by a later run instead of
+	// blocking this one. Apple typically takes hours to days, which is far
+	// longer than any sync should hold a slot open.
+	SnapshotGrace time.Duration
+	PollEvery     time.Duration
+	// Concurrency bounds how many apps are synced at once.
+	Concurrency int
 }
 
 func New(c Client) *Ingester {
-	return &Ingester{c: c, SnapshotWait: 4 * time.Hour, PollEvery: 2 * time.Minute}
+	return &Ingester{c: c, SnapshotGrace: 2 * time.Minute, PollEvery: 20 * time.Second, Concurrency: 4}
 }
 
 func (in *Ingester) Store() models.Store { return models.StoreAppStore }
+
+// AppConcurrency implements sync.ConcurrentIngester.
+func (in *Ingester) AppConcurrency() int { return in.Concurrency }
 
 func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]models.App, error) {
 	apps, err := in.c.Apps(ctx)
@@ -190,26 +198,36 @@ func (in *Ingester) reportRequest(ctx context.Context, rc *osync.RunContext, app
 			snapshot = r.ID
 			rc.Log("info", &app.ID, "requested ONE_TIME_SNAPSHOT %s; Apple may take hours to produce it", snapshot)
 		}
-		// wait for the snapshot to have any instances
-		deadline := time.Now().Add(in.SnapshotWait)
+		// Give Apple a short grace period, then move on.
+		//
+		// Blocking here for hours was pointless: the request id is persisted
+		// and re-found by ReportRequests on the next run, so waiting buys
+		// nothing that patience across runs does not. Worse, the wait was per
+		// app and the loop is sequential, so N apps without a ready snapshot
+		// cost N × SnapshotWait — 19 apps × 4h = 76h for a single full sync,
+		// during which no other app was even attempted.
+		deadline := time.Now().Add(in.SnapshotGrace)
+		ready := false
 		for {
 			reps, err := in.c.Reports(ctx, snapshot, appstoreconnect.ReportDownloads)
 			if err == nil && len(reps) > 0 {
 				if insts, err := in.c.Instances(ctx, reps[0].ID); err == nil && len(insts) > 0 {
+					ready = true
 					break
 				}
 			}
-			if time.Now().After(deadline) {
-				rc.Log("warn", &app.ID, "snapshot not ready after %s; will use ONGOING data if any and retry next run", in.SnapshotWait)
-				snapshot = ""
+			if !time.Now().Before(deadline) {
 				break
 			}
-			rc.Log("info", &app.ID, "waiting for Apple to generate the snapshot…")
 			select {
 			case <-time.After(in.PollEvery):
 			case <-ctx.Done():
 				return "", ctx.Err()
 			}
+		}
+		if !ready {
+			rc.Log("info", &app.ID, "snapshot not ready yet; Apple is still generating it. Historical data will be picked up automatically on a later run — no action needed")
+			snapshot = ""
 		}
 	}
 	if ongoing == "" {
@@ -406,6 +424,13 @@ func nz(s *string) *string {
 func (in *Ingester) syncRating(ctx context.Context, rc *osync.RunContext, app models.App) error {
 	lk, err := in.c.Lookup(ctx, app.StoreAppID, "us")
 	if err != nil {
+		// The public storefront has no entry for an app that has not been
+		// released yet. That is a fact about the app, not a failure of the
+		// sync, and it must not mark the app — or the whole run — as failed.
+		if errors.Is(err, storeclient.ErrNotFound) {
+			rc.Log("info", &app.ID, "no public store listing yet (unreleased); skipping rating")
+			return nil
+		}
 		return err
 	}
 	avg, cnt := lk.RatingAvg, lk.RatingCount

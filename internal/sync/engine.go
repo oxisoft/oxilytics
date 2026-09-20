@@ -33,6 +33,13 @@ type Ingester interface {
 	SyncApp(ctx context.Context, rc *RunContext, app models.App) error
 }
 
+// ConcurrentIngester lets an ingester opt into syncing several apps at once.
+// Ingesters that do not implement it stay sequential.
+type ConcurrentIngester interface {
+	// AppConcurrency is how many apps may be in flight simultaneously.
+	AppConcurrency() int
+}
+
 // Engine owns running syncs.
 type Engine struct {
 	db        *store.DB
@@ -237,6 +244,7 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 	failed := 0
 	var appErrs []error
 	var fatal error
+	var resMu sync.Mutex // guards failed, appErrs, fatal, run.AppsDone
 	stopTicker := make(chan struct{})
 	go func() {
 		t := time.NewTicker(2 * time.Second)
@@ -247,44 +255,90 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 				pmu.Lock()
 				m, r := rowsMetrics, rowsReviews
 				pmu.Unlock()
-				_ = e.db.UpdateSyncProgress(bg, run.ID, run.AppsDone, m, r)
+				resMu.Lock()
+				done := run.AppsDone
+				resMu.Unlock()
+				_ = e.db.UpdateSyncProgress(bg, run.ID, done, m, r)
 			case <-stopTicker:
 				return
 			}
 		}
 	}()
 
-	for i, app := range apps {
-		if ctx.Err() != nil {
+	// Apps are independent of each other, so slow ones must not hold up the
+	// rest. Concurrency is bounded and opt-in per ingester to stay within
+	// store API rate limits.
+	workers := 1
+	if ci, ok := in.(ConcurrentIngester); ok {
+		if n := ci.AppConcurrency(); n > 1 {
+			workers = n
+		}
+	}
+	if workers > len(apps) {
+		workers = len(apps)
+	}
+
+	// cancelled by the first fatal error, so a bad credential stops the run
+	// instead of repeating the same failure for every remaining app.
+	appCtx, cancelApps := context.WithCancel(ctx)
+	defer cancelApps()
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, workers)
+	for _, app := range apps {
+		if appCtx.Err() != nil {
 			break
 		}
-		as := rc.Stats.app(app.ID, app.Name)
-		t0 := time.Now()
-		appID := app.ID
-		log("info", &appID, "syncing %s (%s)", app.Name, app.StoreAppID)
-		err := in.SyncApp(ctx, rc, app)
-		as.MS = time.Since(t0).Milliseconds()
-		if err != nil {
-			if ctx.Err() != nil {
-				break
+		wg.Add(1)
+		go func(app models.App) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if appCtx.Err() != nil {
+				return
 			}
-			as.Errors++
-			rc.Stats.Errors++
-			failed++
-			appErrs = append(appErrs, err)
-			log("error", &appID, "%s: %v", app.Name, err)
-			if isFatal(err) {
-				fatal = err
-				break
+			as := rc.Stats.app(app.ID, app.Name)
+			t0 := time.Now()
+			appID := app.ID
+			log("info", &appID, "syncing %s (%s)", app.Name, app.StoreAppID)
+			err := in.SyncApp(appCtx, rc, app)
+			as.MS = time.Since(t0).Milliseconds()
+
+			resMu.Lock()
+			defer resMu.Unlock()
+			if err != nil {
+				if appCtx.Err() != nil {
+					return
+				}
+				as.Errors++
+				rc.Stats.Errors++
+				failed++
+				appErrs = append(appErrs, err)
+				log("error", &appID, "%s: %v", app.Name, err)
+				if isFatal(err) && fatal == nil {
+					// A fatal error aborts the run; the app that triggered it
+					// is not counted as processed.
+					fatal = err
+					cancelApps()
+					return
+				}
+				// A non-fatal failure still counts as attempted: AppsDone
+				// drives the progress bar, which must reach the total even
+				// when some apps fail.
+				run.AppsDone++
+				return
 			}
-		} else {
 			_ = e.db.TouchAppSynced(bg, app.ID)
-		}
-		run.AppsDone = i + 1
+			run.AppsDone++
+		}(app)
 	}
+	wg.Wait()
 	close(stopTicker)
+	resMu.Lock()
+	done := run.AppsDone
+	resMu.Unlock()
 	pmu.Lock()
-	_ = e.db.UpdateSyncProgress(bg, run.ID, run.AppsDone, rowsMetrics, rowsReviews)
+	_ = e.db.UpdateSyncProgress(bg, run.ID, done, rowsMetrics, rowsReviews)
 	pmu.Unlock()
 
 	switch {

@@ -85,7 +85,7 @@ func TestFullSync(t *testing.T) {
 		appstoreconnect.ReportCrashes:   "Date\tApp Apple Identifier\tTerritory\tCrashes\n2026-09-01\t111\tUnited States\t7\n",
 	}}
 	ing := New(m)
-	ing.SnapshotWait = time.Second
+	ing.SnapshotGrace = time.Second
 	ing.PollEvery = 10 * time.Millisecond
 	rc := &osync.RunContext{DB: db, Mode: models.SyncFull, From: "2008-07-10", To: "2026-09-10", OverlapDays: 3,
 		Log: func(l string, _ *int64, f string, a ...any) { t.Logf("[%s] "+f, append([]any{l}, a...)...) }, AddRows: func(int64, int64) {}, Stats: &osync.Stats{Apps: map[string]*osync.AppStat{}, Steps: map[string]int64{}}}
