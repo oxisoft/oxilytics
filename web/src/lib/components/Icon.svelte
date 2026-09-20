@@ -1,6 +1,10 @@
 <script>
   // Inline SVG icons; `name` selects one. No icon package.
-  let { name, class: cls = 'h-4 w-4' } = $props();
+  // `class` ADDS to the default size instead of replacing it: passing only a
+  // colour (class="text-zinc-400") used to drop h-4 w-4 and render the glyph at
+  // full container width. Pass any h-*/w-* to override the size deliberately.
+  let { name, class: cls = '' } = $props();
+  const klass = $derived(/(^|\s)[hw]-/.test(cls) ? cls : ('h-4 w-4 ' + cls).trim());
   const paths = {
     dashboard: 'M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-18v6h8V3h-8z',
     products: 'M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2',
@@ -41,6 +45,6 @@
   const filled = $derived(name === 'apple' || name === 'android' || name === 'windows' || name === 'star');
 </script>
 
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class={cls} fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class={klass} fill={filled ? 'currentColor' : 'none'} stroke={filled ? 'none' : 'currentColor'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d={paths[name] || paths.info} />
 </svg>

@@ -18,6 +18,7 @@ import (
 type Check struct {
 	Name   string `json:"name"`
 	OK     bool   `json:"ok"`
+	Info   bool   `json:"info,omitempty"`
 	Detail string `json:"detail,omitempty"`
 }
 
@@ -50,7 +51,9 @@ func checkASC(c config.ASCConfig) StoreStatus {
 	ss := StoreStatus{Store: models.StoreAppStore, Info: map[string]string{
 		"key_id": c.KeyID, "issuer_id": c.IssuerID, "key_file": c.KeyFile,
 	}}
-	add := func(name string, ok bool, detail string) { ss.Checks = append(ss.Checks, Check{name, ok, detail}) }
+	add := func(name string, ok bool, detail string) {
+		ss.Checks = append(ss.Checks, Check{Name: name, OK: ok, Detail: detail})
+	}
 
 	add("OXI_ASC_KEY_ID set", c.KeyID != "", "")
 	add("OXI_ASC_ISSUER_ID set", c.IssuerID != "", "")
@@ -100,7 +103,9 @@ func checkGPlay(c config.GPlayConfig) StoreStatus {
 	ss := StoreStatus{Store: models.StoreGooglePlay, Info: map[string]string{
 		"sa_file": c.SAFile, "bucket": c.Bucket,
 	}}
-	add := func(name string, ok bool, detail string) { ss.Checks = append(ss.Checks, Check{name, ok, detail}) }
+	add := func(name string, ok bool, detail string) {
+		ss.Checks = append(ss.Checks, Check{Name: name, OK: ok, Detail: detail})
+	}
 
 	add("OXI_GPLAY_BUCKET set", c.Bucket != "", "")
 	b, err := os.ReadFile(c.SAFile)

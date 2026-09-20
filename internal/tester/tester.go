@@ -16,6 +16,11 @@ import (
 	"github.com/oxisoft/oxilytics/internal/storeclient/googleplay"
 )
 
+// lookupProbeLimit caps how many apps the connection test probes against the
+// public storefront: enough to tell "nothing is released yet" from "the
+// endpoint is unreachable", without a slow serial walk of a large account.
+const lookupProbeLimit = 5
+
 type Tester struct {
 	cfg *config.Config
 }
@@ -100,10 +105,33 @@ func (t *Tester) testASC(ctx context.Context, res *setup.TestResult) {
 	} else {
 		res.Step("customer reviews", true, fmt.Sprintf("readable for %q", first.Name))
 	}
-	if _, err := c.Lookup(ctx, first.ID, "us"); err != nil {
-		res.Step("iTunes lookup (public)", false, explain(err))
-	} else {
-		res.Step("iTunes lookup (public)", true, "")
+	// The public storefront only knows publicly released apps, so a lookup on an
+	// arbitrary app says nothing about the credentials — it says whether that one
+	// app has shipped. Report it as an observation, and only fail on a genuine
+	// transport error (DNS, TLS, proxy), which would break icon and rating sync.
+	released, checked := 0, 0
+	var transportErr error
+	for i := range apps {
+		if checked == lookupProbeLimit {
+			break
+		}
+		checked++
+		switch _, err := c.Lookup(ctx, apps[i].ID, "us"); {
+		case err == nil:
+			released++
+		case errors.Is(err, storeclient.ErrNotFound):
+			// not on the public store yet: expected for a new or unreleased app
+		default:
+			transportErr = err
+		}
+	}
+	switch {
+	case transportErr != nil:
+		res.Step("iTunes lookup (public)", false, explain(transportErr))
+	case released > 0:
+		res.Step("iTunes lookup (public)", true, fmt.Sprintf("%d of %d apps checked are on the public store", released, checked))
+	default:
+		res.Note("iTunes lookup (public)", fmt.Sprintf("reachable; none of the %d apps checked are publicly released yet, so ratings and icons stay empty until one ships", checked))
 	}
 }
 

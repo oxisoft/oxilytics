@@ -15,6 +15,13 @@ func (t *TestResult) Step(name string, ok bool, detail string) {
 	}
 }
 
+// Note records something the operator should see that is NOT a verdict on the
+// credentials — an observation about the account's own data. It never fails the
+// test, because nothing the operator could configure would change it.
+func (t *TestResult) Note(name, detail string) {
+	t.Steps = append(t.Steps, Check{Name: name, OK: true, Info: true, Detail: detail})
+}
+
 type EnvVar struct {
 	Name    string `json:"name"`
 	Example string `json:"example"`

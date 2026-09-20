@@ -55,7 +55,7 @@
       <div class="mb-1 font-medium">{result.ok ? 'Connection OK' : 'Connection failed'}</div>
       <ul class="space-y-0.5">
         {#each result.steps as s}
-          <li class="flex items-start gap-2"><span class={s.ok ? 'text-emerald-600' : 'text-red-600'}><Icon name={s.ok ? 'check' : 'x'} /></span><span>{s.name}{#if s.detail}<span class="ml-1 text-xs text-zinc-500">— {s.detail}</span>{/if}</span></li>
+          <li class="flex items-start gap-2"><span class={s.info ? 'text-zinc-400' : s.ok ? 'text-emerald-600' : 'text-red-600'}><Icon name={s.info ? 'info' : s.ok ? 'check' : 'x'} /></span><span>{s.name}{#if s.detail}<span class="ml-1 text-xs text-zinc-500">— {s.detail}</span>{/if}</span></li>
         {/each}
       </ul>
     </div>
