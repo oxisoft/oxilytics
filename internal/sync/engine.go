@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -233,6 +235,7 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 	log("info", nil, "%d active apps", len(apps))
 
 	failed := 0
+	var appErrs []error
 	var fatal error
 	stopTicker := make(chan struct{})
 	go func() {
@@ -268,6 +271,7 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 			as.Errors++
 			rc.Stats.Errors++
 			failed++
+			appErrs = append(appErrs, err)
 			log("error", &appID, "%s: %v", app.Name, err)
 			if isFatal(err) {
 				fatal = err
@@ -290,7 +294,7 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 	case fatal != nil:
 		e.finish(run, models.SyncFailed, fatal, rc.Stats)
 	case len(apps) > 0 && failed == len(apps):
-		e.finish(run, models.SyncFailed, fmt.Errorf("all %d apps failed", failed), rc.Stats)
+		e.finish(run, models.SyncFailed, fmt.Errorf("all %d apps failed: %s", failed, summarizeErrors(appErrs)), rc.Stats)
 	default:
 		if failed > 0 {
 			log("warn", nil, "finished with %d app errors", failed)
@@ -335,6 +339,46 @@ func (f *FatalError) Unwrap() error { return f.Err }
 func isFatal(err error) bool {
 	var f *FatalError
 	return errors.As(err, &f)
+}
+
+// summarizeErrors turns a pile of per-app failures into one line worth showing
+// on the runs list. When every app failed for the same reason — the usual case
+// for a schema or credential problem — that reason IS the headline, so report
+// it verbatim instead of the useless "all N apps failed".
+func summarizeErrors(errs []error) string {
+	if len(errs) == 0 {
+		return "no error recorded"
+	}
+	counts := map[string]int{}
+	order := []string{}
+	for _, err := range errs {
+		msg := firstLine(err.Error())
+		if _, seen := counts[msg]; !seen {
+			order = append(order, msg)
+		}
+		counts[msg]++
+	}
+	sort.SliceStable(order, func(i, j int) bool { return counts[order[i]] > counts[order[j]] })
+	if len(order) == 1 {
+		return order[0]
+	}
+	parts := make([]string, 0, 3)
+	for _, msg := range order[:min(len(order), 2)] {
+		parts = append(parts, fmt.Sprintf("%s (%d apps)", msg, counts[msg]))
+	}
+	if len(order) > 2 {
+		parts = append(parts, fmt.Sprintf("and %d more distinct errors", len(order)-2))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// firstLine keeps an error summary to its headline: per-app errors join several
+// failures with newlines, which would otherwise wreck a single-line table cell.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
 }
 
 func slogLevel(l string) slog.Level {

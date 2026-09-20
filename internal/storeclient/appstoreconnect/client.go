@@ -362,8 +362,9 @@ type ReportRequest struct {
 type reportRequestResource struct {
 	ID         string `json:"id"`
 	Attributes struct {
-		AccessType   AccessType `json:"accessType"`
-		StoppedDueTo string     `json:"stoppedDueToInactivity"`
+		AccessType AccessType `json:"accessType"`
+		// Apple returns a JSON boolean here, not a string.
+		StoppedDueTo bool `json:"stoppedDueToInactivity"`
 	} `json:"attributes"`
 }
 
@@ -375,7 +376,7 @@ func (c *Client) ReportRequests(ctx context.Context, appID string) ([]ReportRequ
 	}
 	out := make([]ReportRequest, 0, len(rs))
 	for _, r := range rs {
-		out = append(out, ReportRequest{ID: r.ID, AccessType: r.Attributes.AccessType, Stopped: r.Attributes.StoppedDueTo == "true"})
+		out = append(out, ReportRequest{ID: r.ID, AccessType: r.Attributes.AccessType, Stopped: r.Attributes.StoppedDueTo})
 	}
 	return out, nil
 }

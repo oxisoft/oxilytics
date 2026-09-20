@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -190,4 +191,48 @@ func TestSuggestProductNeverLinks(t *testing.T) {
 	if got.SuggestedProductID != nil {
 		t.Error("suggested while disabled")
 	}
+}
+
+func TestSummarizeErrors(t *testing.T) {
+	t.Run("no errors", func(t *testing.T) {
+		if got := summarizeErrors(nil); got != "no error recorded" {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("one shared cause is reported verbatim", func(t *testing.T) {
+		// The real regression: 19 apps failing on one schema mismatch used to
+		// surface as "all 19 apps failed" with the reason nowhere in the UI.
+		errs := make([]error, 19)
+		for i := range errs {
+			errs[i] = errors.New("reports: cannot unmarshal bool into field stoppedDueToInactivity")
+		}
+		got := summarizeErrors(errs)
+		want := "reports: cannot unmarshal bool into field stoppedDueToInactivity"
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("multi-line errors keep only the headline", func(t *testing.T) {
+		got := summarizeErrors([]error{errors.New("reports: boom\nrating: not found")})
+		if got != "reports: boom" {
+			t.Errorf("got %q", got)
+		}
+	})
+
+	t.Run("distinct causes are ranked by count", func(t *testing.T) {
+		errs := []error{
+			errors.New("rare"),
+			errors.New("common"), errors.New("common"), errors.New("common"),
+			errors.New("other"), errors.New("other"),
+		}
+		got := summarizeErrors(errs)
+		if !strings.HasPrefix(got, "common (3 apps); other (2 apps)") {
+			t.Errorf("got %q", got)
+		}
+		if !strings.Contains(got, "1 more distinct") {
+			t.Errorf("missing overflow note: %q", got)
+		}
+	})
 }

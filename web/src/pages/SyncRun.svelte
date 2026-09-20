@@ -31,6 +31,7 @@
 
   const stats = $derived.by(() => { try { return run?.stats ? JSON.parse(run.stats) : null; } catch { return null; } });
   const shown = $derived(level ? logs.filter((l) => l.level === level) : logs);
+  const errorCount = $derived(logs.filter((l) => l.level === 'error').length);
   const lvlCls = { error: 'text-red-600', warn: 'text-amber-600', info: 'text-zinc-700 dark:text-zinc-300', debug: 'text-zinc-400' };
 
   async function cancel() { try { await api.post('/sync/runs/' + run.id + '/cancel'); toasts.success('Cancelling…'); } catch (e) { toasts.error(e.message); } }
@@ -64,6 +65,7 @@
     <div class="card lg:col-span-2">
       <div class="mb-2 flex items-center gap-2">
         <h2 class="font-medium">Log</h2>
+        {#if errorCount}<button class="badge bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300" onclick={() => (level = level === 'error' ? '' : 'error')}>{errorCount} error{errorCount === 1 ? '' : 's'}{level === 'error' ? ' — show all' : ' — show only'}</button>{/if}
         <select class="input ml-auto w-auto text-xs" bind:value={level}><option value="">all levels</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select>
         <label class="flex items-center gap-1 text-xs"><input type="checkbox" bind:checked={autoScroll} />auto-scroll</label>
       </div>

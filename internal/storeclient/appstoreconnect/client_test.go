@@ -61,7 +61,7 @@ func TestAppsReviewsAndReports(t *testing.T) {
 		 "links":{"next":"http://` + r.Host + `/v1/apps/111/customerReviews?page=2"}}`))
 	})
 	mux.HandleFunc("/v1/apps/111/analyticsReportRequests", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"data":[{"id":"req1","attributes":{"accessType":"ONGOING","stoppedDueToInactivity":"false"}}],"links":{}}`))
+		w.Write([]byte(`{"data":[{"id":"req1","attributes":{"accessType":"ONGOING","stoppedDueToInactivity":false}}],"links":{}}`))
 	})
 	mux.HandleFunc("/v1/analyticsReportRequests", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {

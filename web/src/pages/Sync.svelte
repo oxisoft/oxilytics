@@ -71,7 +71,7 @@
           {/if}
           <dl class="mb-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             <dt class="text-zinc-500">Last run</dt>
-            <dd>{#if s.last}<span class="badge {statusCls[s.last.status]}">{s.last.status}</span> <span class="text-zinc-500">{s.last.mode} · {ago(s.last.finished_at || s.last.started_at)} · {fmtDuration(s.last.started_at, s.last.finished_at)} · {fmtNum(s.last.rows_metrics)} rows</span>{#if s.last.error}<div class="mt-0.5 text-xs text-red-600">{s.last.error}</div>{/if}{:else}<span class="text-zinc-400">never</span>{/if}</dd>
+            <dd>{#if s.last}<span class="badge {statusCls[s.last.status]}">{s.last.status}</span> <span class="text-zinc-500">{s.last.mode} · {ago(s.last.finished_at || s.last.started_at)} · {fmtDuration(s.last.started_at, s.last.finished_at)} · {fmtNum(s.last.rows_metrics)} rows</span>{#if s.last.error}<div class="mt-0.5 text-xs text-red-600">{s.last.error} <a href="/sync/runs/{s.last.id}" use:link class="underline whitespace-nowrap">view log</a></div>{/if}{:else}<span class="text-zinc-400">never</span>{/if}</dd>
             <dt class="text-zinc-500">Next scheduled</dt>
             <dd>{status.next_scheduled ? fmtDateTime(status.next_scheduled) : 'disabled'}{#if settings && !(settings['sync.schedule.stores'] || '').includes(st)}<span class="text-xs text-zinc-400"> (this store excluded)</span>{/if}</dd>
           </dl>
@@ -110,7 +110,7 @@
             <td class="text-right tabular-nums">{r.apps_done}/{r.apps_total}</td>
             <td class="text-right tabular-nums">{fmtNum(r.rows_metrics)}</td>
             <td class="text-right tabular-nums">{fmtNum(r.rows_reviews)}</td>
-            <td class="max-w-xs truncate text-xs text-red-600" title={r.error}>{r.error || ''}</td>
+            <td class="max-w-xs text-xs text-red-600">{#if r.error}<a href="/sync/runs/{r.id}" use:link class="line-clamp-2 hover:underline" title={r.error}>{r.error}</a>{/if}</td>
           </tr>
         {:else}<tr><td colspan="10" class="py-8 text-center text-zinc-400">No runs yet</td></tr>{/each}
       </tbody>
