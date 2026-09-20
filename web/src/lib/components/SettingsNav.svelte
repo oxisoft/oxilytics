@@ -4,7 +4,6 @@
     { path: '/settings', label: 'General' },
     { path: '/settings/stores', label: 'Stores' },
     { path: '/settings/users', label: 'Users' },
-    { path: '/settings/ignored', label: 'Ignored apps' },
   ];
 </script>
 

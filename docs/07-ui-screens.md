@@ -51,7 +51,7 @@ a sync"), error banner with retry, and "store not configured" notices.
 | `#/settings` | Settings – General | admin |
 | `#/settings/users` | Settings – Users | admin |
 | `#/settings/stores` | Settings – Stores (status + guides, same component as Setup) | admin |
-| `#/settings/ignored` | Settings – Ignored apps | admin |
+| `#/settings/ignored` | redirects to `#/products?tab=ignored` (kept for old links) | admin |
 | `#/profile` | My profile | any |
 | `#/about` | About (modal) | any |
 | `*` | 404 | |
@@ -181,15 +181,16 @@ Raw view of what the stores expose, mainly for admins.
 Same component as **Setup** (store cards, checks, guides, test connection), embedded in
 the settings layout. This is where an admin adds the second store later.
 
-## 14b. Settings – Ignored apps (`#/settings/ignored`)
-The only place ignored listings exist. Deliberately tucked under Settings so day-to-day
-screens stay clean.
+## 14b. Ignored apps (`#/products?tab=ignored`)
+The third tab of Products, next to **Products** and **Unassigned**, so the whole
+lifecycle of a listing (unassigned → linked, or unassigned → ignored → restored) is on
+one screen. `#/settings/ignored` redirects here for old links.
 - Table: icon, name, store, platform, store id / package, reason, ignored by, ignored
   on, last data day, rows of data kept.
-- Row actions: **Restore** (returns to Store apps as unassigned; next sync resumes it),
+- Row actions: **Restore** (returns to the Unassigned tab; next sync resumes it),
   edit reason.
-- Empty state: "Nothing ignored. Use *Ignore* on a store app to hide listings you don't care about."
-- Viewers get a 403 for this route and never see a count or hint that ignored apps exist.
+- Empty state: "Nothing ignored. Use *Ignore* on an unassigned app to hide listings you don't care about."
+- Viewers never see the tabs at all, so they get no hint that ignored apps exist.
 
 ## 15. My profile (`#/profile`)
 - Name, email (read-only), change password, TOTP enable (QR via inline generator) /
