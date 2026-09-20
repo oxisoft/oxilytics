@@ -18,6 +18,36 @@ Dates in query params are `YYYY-MM-DD` in `OXI_TZ`.
 | POST | `/me/totp/enable` | any | `{code}` → recovery codes (shown once) |
 | DELETE | `/me/totp` | any | `{password}` |
 
+## API tokens (read-only)
+
+Tokens let scripts and integrations read analytics without a browser session.
+They are **read-only by construction**: the router allows only `GET`/`HEAD`/`OPTIONS`
+for token-authenticated requests, so a token cannot write even when its owner is
+an admin, and a write endpoint added later is denied by default.
+
+Use the `Authorization` header. Tokens in query strings are not accepted, because
+they leak into access logs, browser history and `Referer` headers.
+
+```
+curl -H "Authorization: Bearer oxi_…" https://analytics.example.com/api/products
+```
+
+- Owned by the user who created them; deleting or disabling that user revokes them.
+- Only a SHA-256 hash is stored. The plaintext is shown once at creation and cannot be recovered.
+- `last_used_at` is recorded (at most once a minute per token) so stale tokens are visible.
+- Tokens never expire; revoke them when they are no longer needed.
+- Managed from **My profile → API tokens**, session-only: a token cannot mint or revoke tokens.
+
+| Method | Path | Role | Notes |
+|--------|------|------|-------|
+| GET | `/me/tokens` | any (session only) | list own tokens; never returns plaintext |
+| POST | `/me/tokens` | any (session only) | `{name}` → `201 {…, token}` — the only time plaintext is returned |
+| DELETE | `/me/tokens/{id}` | any (session only) | revoke; takes effect immediately |
+
+Failure modes: `401 invalid_token` (unknown, revoked, or owner disabled),
+`403 read_only_token` (write attempted with a token),
+`403 session_required` (token used on a session-only endpoint).
+
 ## Users (admin)
 | GET | `/users` | list |
 | POST | `/users` | `{email,name,role,password}` |

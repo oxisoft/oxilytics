@@ -195,6 +195,10 @@ one screen. `#/settings/ignored` redirects here for old links.
 ## 15. My profile (`#/profile`)
 - Name, email (read-only), change password, TOTP enable (QR via inline generator) /
   disable, recovery codes.
+- **API tokens**: create (name required), list (name, prefix, created, last used),
+  revoke with confirmation. The plaintext is shown once in a modal with a
+  ready-to-paste `curl` example, then never again. Copy says plainly that tokens
+  are read-only. Session-only — the API refuses token management over a token.
 
 ## 16. About (modal)
 - Version, commit, build time, Go version, link to repo, licence.

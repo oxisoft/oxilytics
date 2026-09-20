@@ -42,6 +42,7 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(d.Auth.TokenMiddleware)
 	r.Use(d.Auth.Middleware)
 	r.Use(requestLogger)
 
@@ -58,6 +59,7 @@ func NewRouter(d Deps) http.Handler {
 		// authenticated
 		r.Group(func(r chi.Router) {
 			r.Use(a.requireUser)
+			r.Use(a.readOnlyForTokens)
 			r.Post("/auth/logout", a.logout)
 			r.Get("/me", a.me)
 			r.Put("/me", a.updateMe)
@@ -65,6 +67,13 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/me/totp/setup", a.totpSetup)
 			r.Post("/me/totp/enable", a.totpEnable)
 			r.Delete("/me/totp", a.totpDisable)
+
+			// Token management is session-only: a token must never be able to
+			// mint or revoke tokens, including its own.
+			r.Group(func(r chi.Router) {
+				r.Use(a.requireSession)
+				a.mountTokens(r)
+			})
 
 			r.Get("/setup/status", a.setupStatus)
 			r.Get("/setup/guide/{store}", a.setupGuide)
@@ -74,6 +83,7 @@ func NewRouter(d Deps) http.Handler {
 			r.With(a.require(permissions.EditSettings)).Put("/settings", a.putSettings)
 
 			r.Route("/users", func(r chi.Router) {
+				r.Use(a.requireSession)
 				r.Use(a.require(permissions.ManageUsers))
 				r.Get("/", a.listUsers)
 				r.Post("/", a.createUser)
@@ -116,6 +126,41 @@ func (a *API) require(action permissions.Action) func(http.Handler) http.Handler
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// requireSession rejects token-authenticated callers from routes that only a
+// logged-in human should reach.
+func (a *API) requireSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, viaToken := auth.TokenFrom(r.Context()); viaToken {
+			writeErr(w, http.StatusForbidden, "session_required",
+				"this endpoint requires an interactive sign-in, not an API token")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// readOnlyForTokens rejects any non-read request made with an API token.
+//
+// Enforced here as a blanket method check rather than per handler: a new write
+// endpoint added later is denied by default, which is the opposite of the
+// usual failure mode where someone forgets to annotate a route. The method
+// whitelist is the guarantee — tokens can never write, whatever the owner's
+// role is or becomes.
+func (a *API) readOnlyForTokens(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, viaToken := auth.TokenFrom(r.Context()); viaToken {
+			switch r.Method {
+			case http.MethodGet, http.MethodHead, http.MethodOptions:
+			default:
+				writeErr(w, http.StatusForbidden, "read_only_token",
+					"API tokens are read-only; use the web interface to make changes")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *API) requireConfigured(next http.Handler) http.Handler {

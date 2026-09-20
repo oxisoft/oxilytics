@@ -149,6 +149,21 @@ Per (store, source, app) "what have I already got".
 
 Lets a delta run skip bucket objects that did not change.
 
+### api_tokens
+| column | notes |
+|--------|-------|
+| id | PK |
+| user_id | FK → `users(id)` `ON DELETE CASCADE`; deleting a user revokes their tokens |
+| name | what the token is for, shown in the UI |
+| token_hash | SHA-256 of the plaintext, UNIQUE; plaintext is never stored |
+| prefix | first characters (`oxi_` + 6) for display, so a token is recognisable without being exposed |
+| created_at, last_used_at, revoked_at | `revoked_at IS NULL` means active; revoked rows are kept as an audit trail |
+
+SHA-256 rather than bcrypt: the token is 256 bits of CSPRNG output with no
+guessable structure, and it is verified on every request where a deliberately
+slow hash would be a DoS vector. `foreign_keys` is ON in the DSN, so the
+cascade actually fires.
+
 ## Retention
 
 `metrics.retention_days > 0` → a nightly job deletes `metric_days` older than N days.

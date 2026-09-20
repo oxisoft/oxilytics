@@ -81,6 +81,13 @@ func UserFromContext(ctx context.Context) *models.User {
 // Middleware loads the session user (if any) into the request context.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A token-authenticated request must not be re-attributed to whatever
+		// cookie happens to be attached, or a stale browser session could
+		// silently upgrade a token call.
+		if _, viaToken := TokenFrom(r.Context()); viaToken {
+			next.ServeHTTP(w, r)
+			return
+		}
 		sess, _ := s.store.Get(r, sessionName)
 		if id, ok := sess.Values[keyUserID].(int64); ok {
 			u, err := s.db.GetUser(r.Context(), id)

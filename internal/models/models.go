@@ -27,6 +27,23 @@ type User struct {
 	LastLoginAt  *time.Time `json:"last_login_at"`
 }
 
+// APIToken is a read-only credential for scripts and integrations. Owned by
+// the user who created it and revoked automatically when that user is deleted.
+// Plaintext is never stored: Hash is SHA-256, Prefix is the visible first
+// characters so a token can be recognised in a list without exposing it.
+type APIToken struct {
+	ID         int64      `json:"id"`
+	UserID     int64      `json:"user_id"`
+	Name       string     `json:"name"`
+	Hash       string     `json:"-"`
+	Prefix     string     `json:"prefix"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+	// Plaintext is populated only in the response that creates the token.
+	Plaintext string `json:"token,omitempty"`
+}
+
 type Store string
 
 const (

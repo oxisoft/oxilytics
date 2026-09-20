@@ -5,6 +5,7 @@
   import Qr from '../lib/components/Qr.svelte';
   import Modal from '../lib/components/Modal.svelte';
   import CopyBlock from '../lib/components/CopyBlock.svelte';
+  import ApiTokens from '../lib/components/ApiTokens.svelte';
 
   let name = $state(session.user?.name || '');
   let pw = $state({ current: '', new: '', confirm: '' });
@@ -98,6 +99,8 @@
       <button class="btn-primary" onclick={startTotp}>Enable two-factor</button>
     {/if}
   </section>
+
+  <ApiTokens />
 </div>
 
 <Modal open={!!recoveryCodes} title="Recovery codes" onclose={() => (recoveryCodes = null)}>
