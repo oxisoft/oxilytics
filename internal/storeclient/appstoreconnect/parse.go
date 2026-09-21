@@ -46,6 +46,11 @@ type Row struct {
 	Deletions   int64
 	Installs    int64
 	Crashes     int64
+
+	// UnknownType is set when Apple reports a download type we do not
+	// recognise. Such rows are counted nowhere: guessing would corrupt a
+	// headline metric, and the name is kept so the gap can be reported.
+	UnknownType string
 }
 
 // ParseReport parses a tab-separated analytics report (segment) into rows.
@@ -121,16 +126,28 @@ func ParseReport(data []byte) ([]Row, error) {
 			}
 		} else if dt := strings.ToLower(get(rec, "download type")); dt != "" {
 			// Downloads report: one row per download type, with Counts.
+			//
+			// Apple's vocabulary here is wider than it first looks:
+			// "First-time download", "Redownload", "Restore", "Auto-update",
+			// "Manual update". Only the first is a new user. A default branch
+			// that folded anything unrecognised into Downloads silently
+			// inflated the figure — "Restore" alone added 22 to one app's 656
+			// and made our total disagree with App Store Connect.
 			n := num(rec, "counts", "count", "downloads")
 			switch {
 			case strings.HasPrefix(dt, "first"):
 				row.Downloads = n
-			case strings.HasPrefix(dt, "redownload"):
+			case strings.HasPrefix(dt, "redownload"), strings.HasPrefix(dt, "restore"):
+				// A restore is the same user reinstalling a purchase they
+				// already own, which is what redownload means.
 				row.Redownloads = n
 			case strings.HasPrefix(dt, "auto-update"), strings.HasPrefix(dt, "manual update"), strings.HasPrefix(dt, "update"):
 				row.Updates = n
 			default:
-				row.Downloads = n
+				// Unknown type: count it nowhere rather than inflating a
+				// headline number. Surfaced via UnknownDownloadTypes so a new
+				// Apple category is noticed instead of silently miscounted.
+				row.UnknownType = get(rec, "download type")
 			}
 		} else {
 			// Column-per-metric shapes (crashes, and any report that puts each

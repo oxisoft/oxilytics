@@ -84,6 +84,64 @@ func TestParseRealInstallsReportPrefersEventColumn(t *testing.T) {
 	}
 }
 
+// Apple's download-type vocabulary is wider than the obvious three. "Restore"
+// is a real type seen in production: 22 rows for one app, which the old
+// default branch counted as first-time downloads and so reported 678 where
+// App Store Connect showed 656.
+func TestRestoreIsNotAFirstTimeDownload(t *testing.T) {
+	const tsv = "Date\tApp Apple Identifier\tDownload Type\tTerritory\tCounts\n" +
+		"2026-09-01\t111\tFirst-time download\tUnited States\t656\n" +
+		"2026-09-01\t111\tRestore\tUnited States\t22\n" +
+		"2026-09-01\t111\tRedownload\tUnited States\t38\n"
+
+	rows, err := ParseReport([]byte(tsv))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var downloads, redownloads int64
+	for _, r := range rows {
+		downloads += r.Downloads
+		redownloads += r.Redownloads
+		if r.UnknownType != "" {
+			t.Errorf("known type reported as unknown: %q", r.UnknownType)
+		}
+	}
+	if downloads != 656 {
+		t.Errorf("first-time downloads: want 656 (matching App Store Connect), got %d", downloads)
+	}
+	// Restore is the same user reinstalling something they own: 38 + 22.
+	if redownloads != 60 {
+		t.Errorf("redownloads: want 60 (38 redownload + 22 restore), got %d", redownloads)
+	}
+}
+
+// An unrecognised type must be counted nowhere AND reported, so the next new
+// Apple category is noticed rather than silently folded into a headline number.
+func TestUnknownDownloadTypeIsFlaggedNotCounted(t *testing.T) {
+	const tsv = "Date\tApp Apple Identifier\tDownload Type\tTerritory\tCounts\n" +
+		"2026-09-01\t111\tFirst-time download\tUnited States\t10\n" +
+		"2026-09-01\t111\tQuantum Teleport\tUnited States\t99\n"
+
+	rows, err := ParseReport([]byte(tsv))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var total int64
+	var flagged string
+	for _, r := range rows {
+		total += r.Downloads + r.Redownloads + r.Updates
+		if r.UnknownType != "" {
+			flagged = r.UnknownType
+		}
+	}
+	if total != 10 {
+		t.Errorf("unknown type must not be counted: total = %d, want 10", total)
+	}
+	if flagged != "Quantum Teleport" {
+		t.Errorf("unknown type must be reported, got %q", flagged)
+	}
+}
+
 // The names are the whole bug. If someone "tidies" them back to the names shown
 // in the App Store Connect web UI, every sync silently stores zero rows again.
 func TestReportNamesAreApplesExactNames(t *testing.T) {

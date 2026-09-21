@@ -360,12 +360,17 @@ func (in *Ingester) ingestReport(ctx context.Context, rc *osync.RunContext, app 
 	}
 	var total int64
 	maxDay := ""
+	unknownTypes := map[string]int64{}
 	for _, inst := range insts {
 		if ctx.Err() != nil {
 			return maxDay, total, ctx.Err()
 		}
 		// processingDate is when Apple produced it; data inside is ≤ that day.
-		if inst.ProcessingDate != "" && inst.ProcessingDate < from {
+		//
+		// A ONE_TIME_SNAPSHOT is produced once and carries the whole history,
+		// so skipping it on processingDate would discard exactly the backfill
+		// we want. Only skip when the file cannot contain anything new.
+		if inst.ProcessingDate != "" && inst.ProcessingDate < from && inst.Granularity == appstoreconnect.GranularityDaily {
 			continue
 		}
 		urls, err := in.c.SegmentURLs(ctx, inst.ID)
@@ -383,7 +388,7 @@ func (in *Ingester) ingestReport(ctx context.Context, rc *osync.RunContext, app 
 			if err != nil {
 				return maxDay, total, err
 			}
-			rows = append(rows, toMetricDays(app.ID, parsed, from)...)
+			rows = append(rows, toMetricDaysCollect(app.ID, parsed, from, unknownTypes)...)
 		}
 		if len(rows) == 0 {
 			continue
@@ -399,13 +404,22 @@ func (in *Ingester) ingestReport(ctx context.Context, rc *osync.RunContext, app 
 		}
 		rc.Stats.Steps[name] += n
 	}
+	// Apple added a download type we do not classify. Counting it nowhere is
+	// the safe choice, but staying silent about it is not: that is precisely
+	// how "Restore" quietly inflated our download figures.
+	for t, rows := range unknownTypes {
+		rc.Log("warn", &app.ID, "%s: unrecognised download type %q on %d row(s); not counted — classify it in parse.go", name, t, rows)
+	}
 	return maxDay, total, nil
 }
 
 // toMetricDays folds report rows into per-(day,country) rows plus a "*" total.
-func toMetricDays(appID int64, rows []appstoreconnect.Row, from string) []models.MetricDay {
+// Unrecognised download types are returned separately so the caller can warn:
+// they are counted nowhere, and silence would be how the next miscount starts.
+func toMetricDays(appID int64, rows []appstoreconnect.Row, from string) ([]models.MetricDay, map[string]int64) {
 	type key struct{ day, country string }
 	acc := map[key]*models.MetricDay{}
+	unknown := map[string]int64{}
 	get := func(day, country string) *models.MetricDay {
 		k := key{day, country}
 		if acc[k] == nil {
@@ -415,6 +429,10 @@ func toMetricDays(appID int64, rows []appstoreconnect.Row, from string) []models
 	}
 	for _, r := range rows {
 		if r.Date < from {
+			continue
+		}
+		if r.UnknownType != "" {
+			unknown[r.UnknownType]++
 			continue
 		}
 		c := appstoreconnect.Territory(r.Territory)
@@ -433,6 +451,16 @@ func toMetricDays(appID int64, rows []appstoreconnect.Row, from string) []models
 	out := make([]models.MetricDay, 0, len(acc))
 	for _, v := range acc {
 		out = append(out, *v)
+	}
+	return out, unknown
+}
+
+// toMetricDaysCollect is toMetricDays with the unknown-type tally merged into
+// an accumulator shared across all instances of one report.
+func toMetricDaysCollect(appID int64, rows []appstoreconnect.Row, from string, into map[string]int64) []models.MetricDay {
+	out, unknown := toMetricDays(appID, rows, from)
+	for k, v := range unknown {
+		into[k] += v
 	}
 	return out
 }
