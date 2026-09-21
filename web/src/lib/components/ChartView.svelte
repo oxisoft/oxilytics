@@ -5,7 +5,8 @@
   Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, BarController, BarElement, DoughnutController, ArcElement, Tooltip, Legend, Filler);
 
   // type: line | bar | doughnut; series: [{label, values, color?}]; labels: []
-  let { type = 'line', labels = [], series = [], stacked = false, height = 240, legend = true, yFormat = null } = $props();
+  // xUnit: day | week | month — how to abbreviate ISO date labels on the x axis.
+  let { type = 'line', labels = [], series = [], stacked = false, height = 240, legend = true, yFormat = null, xUnit = 'day' } = $props();
   let canvas = $state(null);
   let chart;
 
@@ -25,6 +26,29 @@
 
   function isDark() { return document.documentElement.classList.contains('dark'); }
 
+  // Axis dates: keep them short and let the axis decide how many fit.
+  //
+  // "2026-01-01" is 10 characters; a fixed maxTicksLimit of 12 with rotation
+  // disabled printed twelve of them edge to edge, so they ran together into an
+  // unreadable band. Shorter text plus autoSkip driven by measured width means
+  // the axis drops labels instead of colliding them, at any container size.
+  //
+  // Every bucket arrives as a full ISO date — month buckets are the first of
+  // the month ("2026-03-01"), not "2026-03" — so the unit has to be passed in
+  // rather than inferred from the string. Month buckets keep the year, since a
+  // 12-month window spans two; day and week buckets drop it, because the
+  // resolved range is printed above the chart. Non-date labels (country codes,
+  // platform names, "3★") are passed through untouched.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function shortLabel(raw) {
+    if (typeof raw !== 'string') return raw;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (!m) return raw;
+    const [, year, month, day] = m;
+    if (xUnit === 'month') return `${MONTHS[Number(month) - 1]} ${year}`;
+    return `${Number(day)} ${MONTHS[Number(month) - 1]}`;
+  }
+
   function build(labels, series) {
     const grid = isDark() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     const tick = isDark() ? '#a1a1aa' : '#71717a';
@@ -41,10 +65,31 @@
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: legend && (series.length > 1 || type === 'doughnut'), labels: { color: tick, boxWidth: 10 } },
+        // The axis skips labels; the tooltip title still shows the full raw
+        // label ("2026-03-30"), which is where the skipped detail lives.
         tooltip: { callbacks: yFormat ? { label: (c) => `${c.dataset.label}: ${yFormat(c.parsed.y ?? c.parsed)}` } : {} },
       },
       scales: type === 'doughnut' ? {} : {
-        x: { stacked, grid: { display: false }, ticks: { color: tick, maxTicksLimit: 12, maxRotation: 0 } },
+        // autoSkip with a minimum spacing lets Chart.js drop labels that do not
+        // fit rather than cramming a fixed count together. maxTicksLimit is
+        // deliberately absent: it forces a count regardless of available width,
+        // which is what made the labels collide. The tooltip still shows the
+        // exact date for every point, so skipped ticks lose nothing.
+        x: {
+          stacked,
+          grid: { display: false },
+          ticks: {
+            color: tick,
+            autoSkip: true,
+            autoSkipPadding: 16,
+            maxRotation: 0,
+            minRotation: 0,
+            callback(value) {
+              // In a category scale the callback receives the index.
+              return shortLabel(this.getLabelForValue(value));
+            },
+          },
+        },
         y: { stacked, beginAtZero: true, grid: { color: grid }, ticks: { color: tick, callback: (v) => yFormat ? yFormat(v) : v } },
       },
     };

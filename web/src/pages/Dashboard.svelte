@@ -20,7 +20,6 @@
   let crashes = $state(null);
   let countries = $state(null);
   let products = $state(null);
-  let apps = $state(null);
   let reviews = $state(null);
   let sync = $state(null);
   let bucket = $state('day');
@@ -29,32 +28,45 @@
 
   const group = $derived(filter.product ? 'platform' : 'product');
 
-  // Every app that had a download in the range, biggest first. Apps with zero
-  // downloads are dropped rather than listed as a tail of noughts; the count
-  // is still visible on the Products screen.
-  // filter() already returns a fresh array, but sorting the result of a bare
-  // (apps || []) would sort the state array in place, so keep the copy.
-  const topApps = $derived(
-    (apps || [])
-      .filter((a) => (a.downloads || 0) > 0)
-      .toSorted((x, y) => (y.downloads || 0) - (x.downloads || 0))
+  // Every product that had a download in the range, biggest first. Products
+  // with zero downloads are dropped rather than listed as a tail of noughts;
+  // the full list is still on the Products screen.
+  //
+  // Top performers is per PRODUCT, not per app. A product bundles its iOS and
+  // Android apps, so listing apps showed the same product twice with its
+  // downloads split across two rows.
+  //
+  // /products has no platform parameter, but each row carries by_platform, so
+  // the bar's platform selection is honoured by reading that slice instead of
+  // the portfolio total.
+  //
+  // toSorted keeps the copy: sorting (products || []) directly would reorder
+  // the state array in place.
+  function productDownloads(p) {
+    if (filter.platform) return p.by_platform?.[filter.platform]?.downloads || 0;
+    return p.totals?.downloads || 0;
+  }
+  const topProducts = $derived(
+    (products || [])
+      .map((p) => ({ row: p, downloads: productDownloads(p) }))
+      .filter((x) => x.downloads > 0)
+      .toSorted((x, y) => y.downloads - x.downloads)
   );
-  const topMax = $derived(topApps.length ? topApps[0].downloads : 0);
+  const topMax = $derived(topProducts.length ? topProducts[0].downloads : 0);
 
   async function load() {
     loading = true; error = '';
     const p = filter.params;
     try {
-      [summary, downloads, crashes, countries, products, apps, reviews, sync] = await Promise.all([
+      [summary, downloads, crashes, countries, products, reviews, sync] = await Promise.all([
         api.get('/metrics/summary' + qs(p)),
         api.get('/metrics/series' + qs({ ...p, metric: 'downloads', group, bucket })),
         api.get('/metrics/series' + qs({ ...p, metric: 'crashes', group: 'platform', bucket })),
         api.get('/metrics/countries' + qs({ ...p, limit: 10 })),
+        // /products takes the date range only: it has no platform or product
+        // parameter, so Top performers always covers the whole portfolio.
+        // Filtering it by platform needs a server-side change.
         api.get('/products' + qs({ from: p.from, to: p.to })),
-        // Pass the whole filter, not just the dates: /apps honours platform and
-        // product_id too, and Top performers must obey the same bar as the
-        // KPIs above it.
-        api.get('/apps' + qs(p)),
         api.get('/reviews' + qs({ ...p, per_page: 5 })),
         api.get('/sync/status'),
       ]);
@@ -123,7 +135,7 @@
             </div>
           </div>
           {#if downloads?.series?.length}
-            <ChartView type="line" labels={downloads.buckets} series={downloads.series.map((s) => ({ key: s.key, label: s.label, values: s.values }))} yFormat={fmtCompact} />
+            <ChartView type="line" labels={downloads.buckets} series={downloads.series.map((s) => ({ key: s.key, label: s.label, values: s.values }))} yFormat={fmtCompact} xUnit={bucket} />
           {:else}<p class="py-16 text-center text-sm text-zinc-400">No downloads in this range</p>{/if}
         </div>
       </div>
@@ -131,44 +143,37 @@
       <div class="card flex flex-col">
         <h2 class="mb-2 font-medium">Top performers</h2>
         <!--
-          Per app, not per product: a product can bundle an iOS and an Android
-          app whose numbers come from different stores, and the question here
-          is which individual app actually pulls downloads.
+          Per product, aggregated across its apps: a product can bundle an iOS
+          and an Android app whose numbers come from different stores, and the
+          question here is which product pulls downloads overall.
         -->
-        {#snippet perfRow(a, muted)}
-          {#if a.icon_url}
-            <img src={a.icon_url} alt="" class="h-6 w-6 shrink-0 rounded" />
-          {:else}
-            <span class="grid h-6 w-6 shrink-0 place-items-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800"><Icon name="products" class="h-3 w-3" /></span>
-          {/if}
-          <PlatformGlyph platform={a.platform} class="h-3.5 w-3.5 shrink-0" />
-          <span class="truncate {muted ? 'text-zinc-500' : ''}" title={muted ? `${a.name} — not linked to a product` : a.name}>{a.name}</span>
-          <div class="ml-auto flex shrink-0 items-center gap-2">
-            <div class="hidden h-2 w-16 overflow-hidden rounded bg-zinc-100 sm:block dark:bg-zinc-800">
-              <div class="h-full {muted ? 'bg-zinc-400' : 'bg-brand-500'}" style="width:{topMax ? (a.downloads / topMax) * 100 : 0}%"></div>
-            </div>
-            <span class="w-12 text-right tabular-nums">{fmtCompact(a.downloads)}</span>
-          </div>
-        {/snippet}
-
-        {#if topApps.length}
+        {#if topProducts.length}
           <ul class="flex-1 space-y-0.5 overflow-y-auto pr-1 text-sm">
-            {#each topApps as a (a.id)}
+            {#each topProducts as t (t.row.product.id)}
               <li>
-                <!--
-                  Apps that belong to a product link to that product; an app
-                  nobody has linked yet has nowhere to go, so it stays plain
-                  text rather than becoming a link that 404s.
-                -->
-                {#if a.product_id}
-                  <a href="/products/{a.product_id}" use:link class="-mx-1 flex items-center gap-2 rounded px-1 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                    {@render perfRow(a, false)}
-                  </a>
-                {:else}
-                  <div class="-mx-1 flex items-center gap-2 px-1 py-1">
-                    {@render perfRow(a, true)}
+                <a href="/products/{t.row.product.id}" use:link class="-mx-1 flex items-center gap-2 rounded px-1 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                  {#if productIcon(t.row)}
+                    <img src={productIcon(t.row)} alt="" class="h-6 w-6 shrink-0 rounded" />
+                  {:else}
+                    <span class="grid h-6 w-6 shrink-0 place-items-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800"><Icon name="products" class="h-3 w-3" /></span>
+                  {/if}
+                  <span class="truncate" title={t.row.product.name}>{t.row.product.name}</span>
+                  <!-- Which stores the number covers, so a product with one
+                       platform is not silently compared against one with two.
+                       With a platform selected the number is that platform
+                       only, so show just that glyph. -->
+                  <span class="flex shrink-0 items-center gap-0.5">
+                    {#each t.row.apps.filter((a) => !filter.platform || a.platform === filter.platform) as a (a.id)}
+                      <PlatformGlyph platform={a.platform} class="h-3 w-3 text-zinc-400" />
+                    {/each}
+                  </span>
+                  <div class="ml-auto flex shrink-0 items-center gap-2">
+                    <div class="hidden h-2 w-16 overflow-hidden rounded bg-zinc-100 sm:block dark:bg-zinc-800">
+                      <div class="h-full bg-brand-500" style="width:{topMax ? (t.downloads / topMax) * 100 : 0}%"></div>
+                    </div>
+                    <span class="w-12 text-right tabular-nums">{fmtCompact(t.downloads)}</span>
                   </div>
-                {/if}
+                </a>
               </li>
             {/each}
           </ul>
@@ -180,7 +185,7 @@
       <div class="card">
         <h2 class="mb-2 font-medium">Crashes</h2>
         {#if crashes?.series?.length}
-          <ChartView type="bar" stacked labels={crashes.buckets} series={crashes.series.map((s) => ({ key: s.key, label: PLATFORM_LABEL[s.key] || s.label, values: s.values }))} height={200} />
+          <ChartView type="bar" stacked labels={crashes.buckets} series={crashes.series.map((s) => ({ key: s.key, label: PLATFORM_LABEL[s.key] || s.label, values: s.values }))} height={200} xUnit={bucket} />
         {:else}<p class="py-12 text-center text-sm text-zinc-400">No crashes reported</p>{/if}
       </div>
       <div class="card">
