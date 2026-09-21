@@ -14,7 +14,8 @@ App Store". Platform is a breakdown dimension everywhere, never the primary navi
 ┌────────────────────────────────────────────────────────────────────┐
 │ ◈ OxiLytics   Dashboard  Products  Reviews  Sync  [Settings]   ● me │  top bar (Settings admin-only)
 ├────────────────────────────────────────────────────────────────────┤
-│  [filter bar:  product ▾ | platform: All ▢iOS ▢Android | range ▾ ] │  on data screens
+│  2026-01-01 → 2026-09-20                                            │  resolved dates, small grey text
+│  [ product ▾ ]  [ platform ▾ ]                      [ period ▾ ]    │  on data screens
 │                                                                     │
 │  page content                                                       │
 │                                                                     │
@@ -23,10 +24,25 @@ App Store". Platform is a breakdown dimension everywhere, never the primary navi
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-Global filter state (product, platforms, date range) lives in a store and is mirrored
-into the URL hash query so links are shareable. Platform filter is a multi-toggle
-(All / iOS / Android / … — only platforms with a configured store are shown). Date-range
+Global filter state (product, platform, date range) lives in a store and is mirrored
+into the URL hash query so links are shareable. **Platform is single-select**
+(All platforms / iOS / macOS / Android — only platforms with a configured store are
+shown): the picker chooses exactly one, it is not a set of toggles. Date-range
 presets: 7d, 30d, 90d, 12m, YTD, custom.
+
+All three controls are `SelectMenu` dropdowns (`src/lib/components/SelectMenu.svelte`),
+a button + listbox pair with icon support — a native `<select>` cannot render an icon
+inside an option, so the keyboard and ARIA behaviour is implemented once there and
+reused, rather than three bespoke pickers. `ProductSelect.svelte` is a thin wrapper
+over it.
+
+The **resolved** start and end dates are rendered above the bar as small grey text.
+They are a *result* of the period choice, not a control, which keeps the header
+narrow enough for the dropdowns.
+
+`filter.load()` **resets** any parameter absent from the URL. The filter is a
+page-spanning singleton, so without that reset a platform chosen on one page leaks
+into the next navigation.
 
 Common states every data screen implements: loading skeleton, empty ("No data yet — run
 a sync"), error banner with retry, and "store not configured" notices.
@@ -87,12 +103,34 @@ button. See 10-store-setup-guides.md for the content.
 
 ## 5. Dashboard (`#/`)
 Purpose: one glance at how every product is doing, and how platforms compare.
-- **KPI cards** (for filter range, delta vs previous period): Downloads · Updates ·
-  Uninstalls · Crashes · Avg rating · New reviews. Each card shows a small
-  **per-platform split** underneath (e.g. "iOS 1 240 · Android 3 870").
+
+Grid: the left column stacks the KPI cards above the downloads chart; the right
+column runs their combined height as **Top performers**; a 3-up row sits below.
+
+- **KPI cards** (for filter range, delta vs previous period): Downloads ·
+  Crashes · Avg rating · New reviews. Each card shows a small **per-platform
+  split** underneath (e.g. "iOS 1 240 · Android 3 870").
+
+  > **Updates and Uninstalls are deliberately absent.** Google Play publishes no
+  > updates column at all and Apple's deletions are weekly and volume-gated, so
+  > either card would show a number that is really one store only — presented
+  > beside genuinely cross-store totals. They were removed rather than badged.
+
 - **Downloads over time** — line chart. Series = products (when "All products") or
   platforms (when one product selected). Bucket toggle day / week / month. Legend
   click toggles series.
+- **Top performers** — products ranked by downloads in the range, **aggregated per
+  product, not per store listing**: the iOS and Android builds of one app roll up
+  into a single row, otherwise a product appears twice with its downloads split.
+  `/api/products` already aggregates server-side, so there is no client-side
+  summing. Each row is a link to the product, with its icon and platform glyphs;
+  products with zero downloads are dropped. Scrolls past ~8 rows so a long
+  portfolio cannot stretch the card.
+
+  `/api/products` takes the **date range only** — it has no platform parameter —
+  so the platform filter is applied client-side from each row's `by_platform`
+  totals, and the glyphs then show only the selected platform.
+
 - **Platform share** — donut of downloads by platform for the range.
 - **Crashes over time** — stacked bar by platform.
 - **Ratings** — current rating per product/platform (big number + stars) + star histogram of reviews in range. No rating-over-time chart in v1.
@@ -116,9 +154,12 @@ Purpose: one glance at how every product is doing, and how platforms compare.
 
 ## 7. Product detail (`#/products/:slug`)
 - Header: icon, name, **platform chips** (iOS · Android · Windows-greyed "not yet") — each
-  chip links to the store listing and toggles that platform in the filter; current
-  rating per platform; description; admin edit / manage links.
-- KPI cards, scoped to the product, each with per-platform split.
+  chip links to the store listing and **selects** that platform in the filter (clicking the
+  selected chip clears it back to all platforms — the filter is single-select, so chips
+  select rather than toggle independently); current rating per platform; description;
+  admin edit / manage links.
+- KPI cards, scoped to the product, each with per-platform split. Same four as the
+  dashboard: Updates and Uninstalls are omitted here too, for the same reason.
 - Tabs (every chart in every tab supports "stacked by platform" / "overlaid by platform" /
   "total"):
   - **Overview** — downloads line (per platform), platform share donut, crash rate per
@@ -204,10 +245,29 @@ one screen. `#/settings/ignored` redirects here for old links.
 - Version, commit, build time, Go version, link to repo, licence.
 
 ## Components (`src/lib/components`)
-`TopBar`, `FilterBar`, `PlatformToggle`, `PlatformGlyph`, `DateRangePicker`, `KpiCard`
-(with split), `LineChart`, `BarChart`, `Donut`, `Histogram`, `DataTable`, `StoreBadge`,
-`Stars`, `ProgressBar`, `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Skeleton`,
-`LogView`, `Qr`, `StoreCard`, `CheckList`, `GuideStep`, `CopyBlock`, `ProductPicker`.
+`ApiTokens`, `Banner`, `ChartView` (one Chart.js wrapper for every chart type),
+`ConfirmDialog`, `CopyBlock`, `EmptyState`, `FilterBar`, `Footer`, `Icon`,
+`IgnoredAppsTable`, `IgnoreDialog`, `KpiCard` (with per-platform split), `Modal`,
+`PlatformGlyph`, `ProductPicker`, `ProductSelect` (thin wrapper over `SelectMenu`),
+`ProgressBar`, `Qr`, `ReviewsList`, `SelectMenu` (generic button + listbox dropdown
+with icon support), `SettingsNav`, `Skeleton`, `Stars`, `StoreBadge`, `StoreCard`,
+`Toasts`, `TopBar`.
+
+### Chart date axis
+
+`ChartView` takes an `xUnit` prop (`day` | `week` | `month`) describing what the
+labels mean, and abbreviates ISO dates accordingly: `21 Sep` for days and weeks,
+`Sep 2025` for months — a 12-month window spans two years, so months keep theirs.
+
+The unit is **passed in, never inferred from the label string**: month buckets
+arrive as `2026-03-01`, not `2026-03`, so guessing would render every month as
+"1 Mar". Non-date labels (country codes, `1★`, platform names) are left untouched.
+
+The axis uses `autoSkip` with a minimum tick spacing rather than a fixed
+`maxTicksLimit`. A fixed count forces that many labels to be drawn whatever the
+width, which is how ten-character dates ended up printed edge to edge as an
+unreadable band; `autoSkip` drops the labels that do not fit. The tooltip still
+shows the full label for every point, which is where the skipped detail lives.
 
 ## Accessibility & responsiveness
 - Keyboard-navigable tables and dialogs, focus trap in modals, `aria-live` for toasts and sync progress.

@@ -84,7 +84,7 @@ Failure modes: `401 invalid_token` (unknown, revoked, or owner disabled),
 When `setup_required` is true every other data/sync endpoint returns `503 {"error":{"code":"setup_required"}}`.
 
 ## Products
-| GET | `/products?archived=` | any | list with linked store apps, per-platform 30-day downloads, rating |
+| GET | `/products?archived=&from=&to=` | any | list with linked store apps, downloads for the range (default 30 days), rating. Each entry carries `totals` **and** `by_platform:{ios:{…}, android:{…}}`. **Takes no `platform` or `product_id` parameter** — it is the aggregate-per-product endpoint, so a caller wanting a single platform filters client-side on `by_platform` (this is what the dashboard's Top performers panel does). |
 | POST | `/products` | admin | `{name, icon_url?, description?}` |
 | GET | `/products/{id}` | any | product + store apps |
 | PUT | `/products/{id}` | admin | name, icon_url, description, archived |

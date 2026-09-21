@@ -47,6 +47,26 @@ Quirks:
 Apple has no historical rating endpoint and v1 needs none. Once per run the iTunes
 lookup (`country=us`) fills `apps.rating_avg` / `rating_count` — a snapshot, overwritten each time.
 
+### Icons, and why an App Store app can legitimately have none
+
+The same public iTunes lookup supplies `artworkUrl512`. Two properties of it
+matter, and both look like bugs when you hit them:
+
+1. **It only covers *published* apps.** An app in review, unreleased, or pulled
+   returns `resultCount: 0`. There is nothing to fetch, and no permission that
+   changes this.
+2. **It is storefront-scoped.** `country=` is currently **hardcoded to `us`**, so
+   an app not available in the US storefront returns nothing even when published
+   elsewhere. *(Known limitation — the country should follow the app's actual
+   availability or sweep storefronts.)*
+
+Verified by sweeping 16 storefronts: two of our own apps are absent from **every**
+one (not public anywhere), while a published app returns in all 16. So a missing
+Apple icon is usually the listing's status, not a broken integration.
+
+Products that also ship on Android fall back to the Play listing icon, which is why
+the dashboard can still show an icon for an app with no public App Store presence.
+
 ## Google Play
 
 ### Credentials
@@ -69,7 +89,26 @@ Quirks:
 - Files are **UTF-16 LE with BOM**, comma-separated; the client transcodes.
 - The current month's file is rewritten daily; Google also restates the last few days. Delta re-downloads the current and previous month regardless of `generation`, older months only if `generation` changed (`ingested_objects`).
 - Google exposes no total ratings count through reports or API → `apps.rating_count` stays NULL on Android; the UI shows the average only.
-- Package list = distinct `{pkg}` in file names. Display name and icon are read through the Android Publisher API: `edits.insert` → `edits.listings.get(defaultLanguage)` → `title`, then `edits.images.list(icon)` → URL, then `edits.delete`. Clumsy but official and cheap (once per full sync). If it fails, the store app is created with the package name as name and the admin can override it in the Apps screen.
+- Package list = distinct `{pkg}` in file names. Display name and icon are read through the Android Publisher API: `edits.insert` → `edits.listings.get(defaultLanguage)` → `title`, then the icon, then `edits.delete`. Clumsy but official and cheap (once per full sync). If it fails, the store app is created with the package name as name and the admin can override it in the Apps screen.
+
+  **The icon URL is:**
+
+  ```
+  GET …/applications/{pkg}/edits/{editId}/listings/{lang}/icon
+  ```
+
+  > ⚠️ **Not `…/listings/{lang}/phone/icon`.** Screenshots nest under a form
+  > factor (`phone`, `tenInchTablet`, …); the icon does **not**, and the form-factor
+  > path returns **404** for every app. This cost a long debugging session because
+  > the 404 was swallowed by an `err == nil` check — every Play app silently stored
+  > a NULL icon and nothing was logged — *and* the unit-test mock served the same
+  > wrong path as the client, so the suite was green while production failed. The
+  > mock now serves the real path and a regression test asserts the 404 is
+  > **reported, not swallowed** (`Listing.IconErr`).
+
+  A throwaway edit (`POST …/edits`) is required first and works with a read-only
+  service account. Delta runs retry the icon lookup whenever an app still has none,
+  so icon-less rows backfill instead of waiting for the next full sync.
 
 ### Reviews API
 `GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{pkg}/reviews?maxResults=100&translationLanguage=en`

@@ -21,6 +21,9 @@ One Go binary · one Docker image · one SQLite file · one git repository.
 
 ## Decisions already taken
 
+- **Metric coverage is asymmetric between stores, in both directions**: Google reports no updates, Apple reports no active devices and gates deletions (weekly, volume-limited). A cross-store KPI is shown **only when both stores report it** — otherwise the card is omitted rather than showing a one-platform number dressed as a portfolio total.
+- **The dashboard's Top performers panel aggregates per product, not per store listing** — an app shipping on iOS and Android must not appear twice with its downloads split.
+- **The global filter is single-select for platform** (All / iOS / macOS / Android), not a set of toggles, and it **resets** on load for any parameter absent from the URL.
 - v1 covers **App Store and Google Play only** (Microsoft Store later).
 - **Products are first-class**: a product (e.g. "My Notes") groups its store listings (iOS, Android, later Windows). Every stat is aggregated per product and can be broken down by platform.
 - **At least one store must be configured** or the app refuses to do anything except show the setup guide.

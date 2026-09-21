@@ -79,7 +79,7 @@ Google Cloud project.
    4. Send invite (a service account accepts automatically).
 4. **Find the reports bucket**
    1. Play Console → **Download reports → Statistics** (any app).
-   2. Click **Copy Cloud Storage URI** — it looks like `gs://pubsite_prod_7585836991776671048/stats/installs/`.
+   2. Click **Copy Cloud Storage URI** — it looks like `gs://pubsite_prod_8241096735521408897/stats/installs/`.
    3. The bucket name is the `pubsite_prod_…` part.
 
    > **The bucket name has no `rev_`.** Google's own help page still documents
@@ -92,7 +92,7 @@ Google Cloud project.
 
    ```
    OXI_GPLAY_SA_FILE=/secrets/gplay-sa.json
-   OXI_GPLAY_BUCKET=pubsite_prod_rev_01234567890123456789
+   OXI_GPLAY_BUCKET=pubsite_prod_8241096735521408897
    ```
 6. `docker compose up -d` (restart), then **Test connection**.
 

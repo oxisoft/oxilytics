@@ -85,6 +85,17 @@ analytics.example.com {
 - The backup file is a consistent single-file copy; restore = stop container, replace `oxilytics.db`, delete `-wal`/`-shm`, start.
 - Off-site copy is the host's job (restic/rclone of `./data/backups`).
 
+> ⚠️ **Never copy a live `oxilytics.db` with `cp`/`scp`.** With WAL enabled you
+> capture a torn file that fails `PRAGMA integrity_check` ("database disk image is
+> malformed"). Use the backup file above, or `sqlite3 db ".backup 'out.db'"`.
+>
+> One further trap when moving a copy to another machine: `.backup` writes in the
+> **dumping** SQLite's format, so a file produced by a newer SQLite (e.g. 3.53 in a
+> container) can be rejected as malformed by an older local binary (3.50) even
+> though the bytes transferred are byte-identical. When the two ends may differ,
+> move a **SQL text dump** (`sqlite3 db .dump > out.sql`) and restore it — that is
+> version-independent.
+
 ## Upgrades
 
 Pull new tag, `docker compose up -d`. Migrations are forward-only; a failed migration

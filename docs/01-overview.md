@@ -13,12 +13,26 @@ reports are only kept for ~1 year, and Google Play `reviews.list` returns only t
 |------|-------------------|-------------|
 | App catalogue (name, id, icon, platform) | `GET /v1/apps` + iTunes lookup | package list from bucket file names + Android Publisher `edits.listings` / `edits.images` |
 | Downloads / installs per day, per country | Analytics Reports API (`App Store Downloads` / `App Store Installation and Deletion`) | `stats/installs/*_overview.csv` and `*_country.csv` |
-| Updates, uninstalls/deletions | same reports | same CSVs |
+| Updates | same reports | ❌ **not reported by Play at all** |
+| Uninstalls / deletions | same reports (⚠️ **weekly and volume-gated**) | same CSVs (daily) |
+| Active devices | — | `stats/installs/*_overview.csv` |
 | Rating: current store-wide average + count (snapshot per sync, no history) | iTunes lookup (`averageUserRating`, `userRatingCount`) | `stats/ratings/*_overview.csv` latest `Total Average Rating` |
 | Reviews (text, stars, author, version, country, date) | `GET /v1/apps/{id}/customerReviews` | `reviews/reviews_*.csv` (history) + `reviews.list` (last 7 days) |
 | Crashes per day | Analytics Reports API (`App Crashes`) | `stats/crashes/*_overview.csv` |
 
 Everything is **read-only** against the stores. v1 does not reply to reviews.
+
+### Metric coverage is asymmetric, and the UI must respect that
+
+The two stores do not report the same things, in **both** directions: Google
+publishes no updates column at all, while Apple publishes no active-device count
+and gates deletions behind a weekly, volume-limited report.
+
+**A cross-store KPI is therefore only honest when both stores actually report the
+metric.** Where they do not, the dashboard omits the card rather than showing a
+total that silently means one platform — a portfolio "uninstalls" figure that is
+really Android-only invites exactly the wrong conclusion. Every remaining KPI
+carries its per-platform split underneath so the composition stays visible.
 
 ## Non-goals (v1)
 
