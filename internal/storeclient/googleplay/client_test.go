@@ -144,7 +144,12 @@ func TestClientFlow(t *testing.T) {
 	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1/listings/en-US", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"title":"My Notes"}`))
 	})
-	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1/listings/en-US/phone/icon", func(w http.ResponseWriter, r *http.Request) {
+	// The app icon is a listing-level image type: /listings/{lang}/icon.
+	// Screenshots are the ones nested under a form factor (phone/, tenTablet/).
+	// This mock previously served "phone/icon", mirroring the same wrong
+	// assumption the client made, so the pair agreed with each other and the
+	// real API 404'd in production.
+	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1/listings/en-US/icon", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"images":[{"url":"https://img/icon"}]}`))
 	})
 	srv := httptest.NewServer(mux)
@@ -186,5 +191,51 @@ func TestClientFlow(t *testing.T) {
 	}
 	if err := c.Ping(ctx); err != nil {
 		t.Errorf("ping: %v", err)
+	}
+}
+
+// A listing whose icon endpoint fails must report the failure rather than
+// return an empty IconURL as if the app simply had no icon. The original bug
+// requested a path that 404s for every app and swallowed the error, so the
+// dashboard showed placeholders and no log line ever said why.
+func TestListingIconErrorIsReported(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"access_token":"t","expires_in":3600}`))
+	})
+	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"id":"e1"}`))
+	})
+	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{}`)) })
+	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1/details", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"defaultLanguage":"en-US"}`))
+	})
+	mux.HandleFunc("/androidpublisher/v3/applications/io.x/edits/e1/listings/en-US", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"title":"My Notes"}`))
+	})
+	// No handler for .../icon: the mux answers 404, exactly like the real API
+	// did for the wrong path.
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c, err := New(testSA(t, srv.URL+"/token"), "bkt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.StorageURL, c.PublisherURL = srv.URL, srv.URL
+	c.http.Throttle = 0
+
+	l, err := c.Listing(context.Background(), "io.x")
+	if err != nil {
+		t.Fatalf("listing: %v", err)
+	}
+	if l.Title != "My Notes" {
+		t.Errorf("title = %q, want the listing title even when the icon fails", l.Title)
+	}
+	if l.IconURL != "" {
+		t.Errorf("IconURL = %q, want empty", l.IconURL)
+	}
+	if l.IconErr == nil {
+		t.Fatal("IconErr is nil: a failed icon lookup was swallowed, which is the bug")
 	}
 }

@@ -69,17 +69,24 @@ func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]m
 		}
 		name := pkg
 		var icon *string
-		// Only hit the Publisher API for new apps or full runs (it's slow-ish).
-		if existing == nil || rc.Mode == models.SyncFull {
+		// Hit the Publisher API for new apps, full runs, or whenever we still
+		// have no icon for an app we already know: a delta run would otherwise
+		// never backfill an icon that an earlier bug failed to store.
+		if existing == nil || rc.Mode == models.SyncFull || existing.IconURL == nil || *existing.IconURL == "" {
 			if l, err := in.c.Listing(ctx, pkg); err == nil {
 				if l.Title != "" {
 					name = l.Title
 				}
 				if l.IconURL != "" {
 					icon = &l.IconURL
+				} else if l.IconErr != nil {
+					rc.Log("warn", nil, "%s: icon lookup failed (%v)", pkg, l.IconErr)
 				}
 			} else {
 				rc.Log("warn", nil, "%s: listing lookup failed (%v); using package name", pkg, err)
+				if existing != nil {
+					name = existing.Name
+				}
 			}
 		} else {
 			name = existing.Name

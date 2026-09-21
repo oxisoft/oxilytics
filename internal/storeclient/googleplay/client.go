@@ -319,6 +319,9 @@ func secondsToTime(s string) time.Time {
 type Listing struct {
 	Title   string
 	IconURL string
+	// IconErr records why the icon lookup failed, so the sync can log it.
+	// A silently missing icon looked like "Play has no icons" for weeks.
+	IconErr error
 }
 
 func (c *Client) Listing(ctx context.Context, pkg string) (*Listing, error) {
@@ -352,7 +355,12 @@ func (c *Client) Listing(ctx context.Context, pkg string) (*Listing, error) {
 			_ = json.Unmarshal(lb, &l)
 			out.Title = l.Title
 		}
-		if ib, err := c.get(ctx, base+"/"+edit.ID+"/listings/"+url.PathEscape(lang)+"/phone/icon"); err == nil {
+		// Image type is "icon", NOT "phone/icon". The Publisher API nests
+		// screenshots under a form factor (phone/, tenTablet/…) but the app
+		// icon is a single listing-level image, so "phone/icon" 404s. That 404
+		// used to be swallowed by the `err == nil` check below, leaving every
+		// Play app with no icon and no complaint anywhere.
+		if ib, err := c.get(ctx, base+"/"+edit.ID+"/listings/"+url.PathEscape(lang)+"/icon"); err == nil {
 			var im struct {
 				Images []struct {
 					URL string `json:"url"`
@@ -362,6 +370,8 @@ func (c *Client) Listing(ctx context.Context, pkg string) (*Listing, error) {
 			if len(im.Images) > 0 {
 				out.IconURL = im.Images[0].URL
 			}
+		} else {
+			out.IconErr = err
 		}
 	}
 	return out, nil
