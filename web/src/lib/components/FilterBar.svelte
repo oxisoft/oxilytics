@@ -4,6 +4,7 @@
   import { filter } from '../filter.svelte.js';
   import { session } from '../session.svelte.js';
   import PlatformGlyph from './PlatformGlyph.svelte';
+  import ProductSelect from './ProductSelect.svelte';
   import { STORE_PLATFORMS } from '../format.js';
 
   let { showProduct = true } = $props();
@@ -29,10 +30,7 @@
 
 <div class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
   {#if showProduct}
-    <select class="input w-auto" value={filter.product} onchange={(e) => filter.setProduct(e.target.value)} aria-label="Product">
-      <option value="">All products</option>
-      {#each products as p}<option value={p.product.id}>{p.product.name}</option>{/each}
-    </select>
+    <ProductSelect {products} value={filter.product} onchange={(id) => filter.setProduct(id)} />
   {/if}
 
   <div class="flex items-center gap-1 rounded-md border border-zinc-200 p-0.5 dark:border-zinc-700" role="group" aria-label="Platforms">

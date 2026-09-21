@@ -25,6 +25,10 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
         working-directory: web
+      # Catches un-imported identifiers, which vite build does not: the bundle
+      # succeeds and the page dies at runtime with a ReferenceError.
+      - run: npm run check:names
+        working-directory: web
       - run: npm run build
         working-directory: web
       - uses: actions/setup-go@v7

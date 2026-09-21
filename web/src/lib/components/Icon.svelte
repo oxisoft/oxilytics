@@ -40,6 +40,11 @@
     restore: 'M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8M3 3v5h5',
     apple: 'M16.4 12.6c0-2.5 2-3.6 2.1-3.7a4.5 4.5 0 00-3.5-1.9c-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8A4.7 4.7 0 004.2 9.5c-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4a10 10 0 001.3-2.8 4.3 4.3 0 01-2.6-3.8zM14 5.5A4.2 4.2 0 0015 2.4a4.3 4.3 0 00-2.8 1.4 4 4 0 00-1 3 3.6 3.6 0 002.8-1.3z',
     android: 'M6 10v7a1 1 0 001 1h1v3a1 1 0 002 0v-3h4v3a1 1 0 002 0v-3h1a1 1 0 001-1v-7H6zM4 10a1 1 0 00-1 1v5a1 1 0 002 0v-5a1 1 0 00-1-1zm16 0a1 1 0 00-1 1v5a1 1 0 002 0v-5a1 1 0 00-1-1zM15.5 3.5l1-1.5-.5-.3-1 1.6a6.3 6.3 0 00-6 0L8 1.7l-.5.3 1 1.5A5.5 5.5 0 006 8v1h12V8a5.5 5.5 0 00-2.5-4.5zM9.5 6.5a.7.7 0 110-1.5.7.7 0 010 1.5zm5 0a.7.7 0 110-1.5.7.7 0 010 1.5z',
+    // macOS gets a display rather than a second apple: iOS and macOS otherwise
+    // render the identical glyph, so the two platforms were told apart only by
+    // colour — and in a legend or a table they sat next to each other looking
+    // like a duplicate row.
+    macos: 'M3 5a1 1 0 011-1h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V5zm6 15h6m-3-4v4',
     windows: 'M3 5.5l7.5-1v7H3v-6zM11.5 4.3L21 3v8.5h-9.5V4.3zM3 12.5h7.5v7L3 18.5v-6zM11.5 12.5H21V21l-9.5-1.3v-7.2z',
   };
   const filled = $derived(name === 'apple' || name === 'android' || name === 'windows' || name === 'star');

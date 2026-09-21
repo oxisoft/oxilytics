@@ -5,7 +5,7 @@
   import { filter } from '../lib/filter.svelte.js';
   import { session } from '../lib/session.svelte.js';
   import { toasts } from '../lib/toast.svelte.js';
-  import { fmtNum, fmtCompact, fmtRating, PLATFORM_LABEL, STORE_LABEL } from '../lib/format.js';
+  import { fmtNum, fmtCompact, fmtRating, PLATFORM_LABEL, STORE_LABEL, productIcon } from '../lib/format.js';
   import FilterBar from '../lib/components/FilterBar.svelte';
   import KpiCard from '../lib/components/KpiCard.svelte';
   import ChartView from '../lib/components/ChartView.svelte';
@@ -94,7 +94,7 @@
 {:else}
   <a href="/products" use:link class="mb-2 inline-flex items-center gap-1 text-sm text-zinc-500 hover:underline"><Icon name="chevron" class="h-3.5 w-3.5 rotate-180" />Products</a>
   <div class="mb-4 flex flex-wrap items-center gap-4">
-    {#if product.icon_url || product.apps.find((a) => a.icon_url)}<img src={product.icon_url || product.apps.find((a) => a.icon_url).icon_url} alt="" class="h-14 w-14 rounded-xl" />{/if}
+    {#if productIcon(product)}<img src={productIcon(product)} alt="" class="h-14 w-14 rounded-xl" />{/if}
     <div class="min-w-0 flex-1">
       <h1 class="text-xl font-semibold">{product.name}{#if product.archived}<span class="badge ml-2 bg-zinc-100 dark:bg-zinc-800">archived</span>{/if}</h1>
       {#if product.description}<p class="text-sm text-zinc-500">{product.description}</p>{/if}
@@ -117,10 +117,10 @@
 
   {#if summary}
     <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      <KpiCard label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
-      <KpiCard label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
-      <KpiCard label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
-      <KpiCard label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
+      <KpiCard metric="downloads" label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
+      <KpiCard metric="updates" label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
+      <KpiCard metric="uninstalls" label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
+      <KpiCard metric="crashes" label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
       <KpiCard label="Avg review rating" value={summary.reviews?.avg ?? null} format={fmtRating} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.avg]))} />
       <KpiCard label="Reviews" value={summary.reviews?.count ?? 0} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.count]))} />
     </div>

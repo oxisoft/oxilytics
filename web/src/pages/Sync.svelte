@@ -8,7 +8,6 @@
   import ProgressBar from '../lib/components/ProgressBar.svelte';
   import ConfirmDialog from '../lib/components/ConfirmDialog.svelte';
   import Skeleton from '../lib/components/Skeleton.svelte';
-  import Banner from '../lib/components/Banner.svelte';
   import Icon from '../lib/components/Icon.svelte';
 
   let status = $state(null);
@@ -48,9 +47,8 @@
 
 {#if !status}<Skeleton rows={6} />
 {:else}
-  {#if status.unassigned_apps > 0}
-    <div class="mb-3"><Banner kind="info" message="{status.unassigned_apps} store app{status.unassigned_apps > 1 ? 's' : ''} discovered by sync need{status.unassigned_apps > 1 ? '' : 's'} a product — link or ignore them on the Products screen." /></div>
-  {/if}
+  <!-- The unassigned-apps banner is deliberately not repeated here: the count
+       lives on the Products → Unassigned tab badge. -->
   <div class="mb-4 grid gap-4 lg:grid-cols-2">
     {#each ['appstore', 'googleplay'] as st}
       {@const s = status.stores[st]}

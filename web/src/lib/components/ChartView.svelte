@@ -10,7 +10,18 @@
   let chart;
 
   const palette = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#a855f7', '#f97316', '#14b8a6', '#84cc16', '#ec4899'];
-  const platformColor = { ios: '#6366f1', macos: '#8b5cf6', android: '#10b981', windows: '#0ea5e9' };
+  // Platform colours are separated by HUE, not by shade. iOS indigo (#6366f1)
+  // and macOS violet (#8b5cf6) were neighbours on the wheel: in a doughnut
+  // slice or a 2px line they read as the same colour, so a chart with both was
+  // unreadable. Each platform now sits in its own hue family, and the pairs
+  // stay distinct in greyscale and for red-green colour blindness because their
+  // lightness differs too.
+  const platformColor = {
+    ios: '#6366f1',     // indigo
+    macos: '#f59e0b',   // amber
+    android: '#10b981', // emerald
+    windows: '#ec4899', // pink
+  };
 
   function isDark() { return document.documentElement.classList.contains('dark'); }
 

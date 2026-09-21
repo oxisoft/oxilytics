@@ -1,15 +1,17 @@
 <script>
   import { onMount } from 'svelte';
   import { link, querystring, replace } from 'svelte-spa-router';
-  import { api, ApiError } from '../lib/api.js';
+  import { api, ApiError, qs } from '../lib/api.js';
+  import { filter } from '../lib/filter.svelte.js';
   import { session } from '../lib/session.svelte.js';
   import { toasts } from '../lib/toast.svelte.js';
-  import { fmtCompact, fmtRating, ago, PLATFORM_LABEL } from '../lib/format.js';
+  import { fmtCompact, fmtRating, ago, PLATFORM_LABEL, productIcon } from '../lib/format.js';
   import PlatformGlyph from '../lib/components/PlatformGlyph.svelte';
   import StoreBadge from '../lib/components/StoreBadge.svelte';
   import Modal from '../lib/components/Modal.svelte';
   import Skeleton from '../lib/components/Skeleton.svelte';
   import EmptyState from '../lib/components/EmptyState.svelte';
+  import FilterBar from '../lib/components/FilterBar.svelte';
   import Icon from '../lib/components/Icon.svelte';
   import ProductPicker from '../lib/components/ProductPicker.svelte';
   import IgnoreDialog from '../lib/components/IgnoreDialog.svelte';
@@ -36,13 +38,32 @@
 
   async function load() {
     const [p, s, ig] = await Promise.all([
-      api.get('/products'),
+      // The totals on this page are range-scoped like everywhere else; without
+      // passing the filter they silently used the API default (last 30 days)
+      // while the page showed no date control at all, so the numbers looked
+      // like lifetime figures and disagreed with every other screen.
+      api.get('/products' + qs(filter.params)),
       session.isAdmin ? api.get('/products-suggestions') : Promise.resolve([]),
       session.isAdmin ? api.get('/apps-ignored') : Promise.resolve([]),
     ]);
     products = p; suggestions = s; ignored = ig;
   }
   onMount(load);
+
+  // Reload when the shared filter changes.
+  //
+  // This must NOT read `products`: load() reassigns it, so touching it here
+  // makes the effect re-trigger itself forever — a request storm that starves
+  // every other page in the SPA. Track only the filter fields, and use a plain
+  // (non-reactive) flag to skip the initial run that onMount already covers.
+  let filterKey = null;
+  $effect(() => {
+    const key = [filter.from, filter.to, filter.platforms.join(','), filter.product].join('|');
+    if (filterKey === null) { filterKey = key; return; }  // onMount already loaded
+    if (key === filterKey) return;                         // nothing actually changed
+    filterKey = key;
+    load();
+  });
 
   function openCreate() { editing = null; form = { name: '', icon_url: '', description: '' }; fields = {}; editOpen = true; }
   function openEdit(p) { editing = p; form = { name: p.name, icon_url: p.icon_url || '', description: p.description || '' }; fields = {}; editOpen = true; }
@@ -71,6 +92,12 @@
   <h1 class="text-lg font-semibold">Products</h1>
   {#if session.isAdmin && tab === 'products'}<button class="btn-primary" onclick={openCreate}><Icon name="plus" />New product</button>{/if}
 </div>
+
+<!-- Only the Products tab shows range-scoped numbers; Unassigned and Ignored
+     are inventories, where a date filter would be misleading. -->
+{#if tab === 'products'}
+  <FilterBar showProduct={false} />
+{/if}
 
 {#if session.isAdmin}
   <nav class="mb-4 flex gap-1 border-b border-zinc-200 dark:border-zinc-800" aria-label="Products">
@@ -120,7 +147,7 @@
     {#each products as p (p.product.id)}
       <div class="card flex flex-col">
         <div class="flex items-start gap-3">
-          {#if p.product.icon_url}<img src={p.product.icon_url} alt="" class="h-10 w-10 rounded-lg" />{:else}<div class="grid h-10 w-10 place-items-center rounded-lg bg-zinc-100 text-zinc-400 dark:bg-zinc-800"><Icon name="products" /></div>{/if}
+          {#if productIcon(p)}<img src={productIcon(p)} alt="" class="h-10 w-10 rounded-lg" />{:else}<div class="grid h-10 w-10 place-items-center rounded-lg bg-zinc-100 text-zinc-400 dark:bg-zinc-800"><Icon name="products" /></div>{/if}
           <div class="min-w-0 flex-1">
             <a href="/products/{p.product.slug}" use:link class="block truncate font-medium hover:underline">{p.product.name}</a>
             <div class="mt-0.5 flex gap-1">
@@ -137,7 +164,7 @@
         <div class="mt-3 grid grid-cols-3 gap-2 text-center">
           <div><div class="text-lg font-semibold tabular-nums">{fmtCompact(p.totals.downloads)}</div><div class="text-xs text-zinc-500">downloads</div></div>
           <div><div class="text-lg font-semibold tabular-nums">{fmtCompact(p.totals.crashes)}</div><div class="text-xs text-zinc-500">crashes</div></div>
-          <div><div class="text-lg font-semibold tabular-nums">{p.apps.some((a) => a.rating_avg) ? fmtRating(p.apps.reduce((s, a) => s + (a.rating_avg || 0), 0) / p.apps.filter((a) => a.rating_avg).length) : '—'}</div><div class="text-xs text-zinc-500">rating</div></div>
+          <div><div class="text-lg font-semibold tabular-nums">{p.apps.some((a) => a.rating_avg) ? fmtRating(p.apps.reduce((s, a) => s + (a.rating_avg || 0), 0) / p.apps.filter((a) => a.rating_avg).length) : '—'}</div><div class="text-xs text-zinc-500">rating<span class="text-zinc-400"> · all time</span></div></div>
         </div>
         <div class="mt-2 space-y-0.5 text-xs text-zinc-500">
           {#each p.apps as a}

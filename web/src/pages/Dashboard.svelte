@@ -3,7 +3,7 @@
   import { link } from 'svelte-spa-router';
   import { api, qs } from '../lib/api.js';
   import { filter } from '../lib/filter.svelte.js';
-  import { fmtNum, fmtCompact, fmtRating, fmtDate, fmtPct, PLATFORM_LABEL } from '../lib/format.js';
+  import { fmtNum, fmtCompact, fmtRating, fmtDate, fmtPct, PLATFORM_LABEL, productIcon } from '../lib/format.js';
   import FilterBar from '../lib/components/FilterBar.svelte';
   import KpiCard from '../lib/components/KpiCard.svelte';
   import ChartView from '../lib/components/ChartView.svelte';
@@ -72,9 +72,12 @@
   {#each failedRuns as s}
     <div class="mb-3"><Banner kind="warn" message="Last {s.store === 'appstore' ? 'App Store' : 'Google Play'} sync failed: {s.last.error || 'unknown error'}" /></div>
   {/each}
-  {#if sync?.unassigned_apps > 0}
-    <div class="mb-3"><Banner kind="info" message="{sync.unassigned_apps} store app{sync.unassigned_apps > 1 ? 's are' : ' is'} not linked to a product yet — data from them is not counted in any product." /></div>
-  {/if}
+  <!--
+    The "N store apps are not linked to a product yet" banner lived here, on
+    Products and on Reviews. Products → Unassigned already carries the count in
+    its tab badge and explains the consequence, so repeating it on every screen
+    was noise on a state the user has already seen and chosen to leave as is.
+  -->
 
   {#if !hasData}
     <EmptyState icon="dashboard" title="No data yet" message="Run a sync to pull downloads, crashes and reviews from your stores, then link the discovered apps into products.">
@@ -82,10 +85,10 @@
     </EmptyState>
   {:else}
     <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      <KpiCard label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
-      <KpiCard label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
-      <KpiCard label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
-      <KpiCard label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
+      <KpiCard metric="downloads" label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
+      <KpiCard metric="updates" label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
+      <KpiCard metric="uninstalls" label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
+      <KpiCard metric="crashes" label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
       <KpiCard label="Avg review rating" value={summary.reviews?.avg ?? null} format={fmtRating} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.avg]))} sub="reviews in range" />
       <KpiCard label="New reviews" value={summary.reviews?.count ?? 0} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.count]))} />
     </div>
@@ -141,7 +144,7 @@
           <tbody>
             {#each products || [] as p (p.product.id)}
               <tr>
-                <td><a href="/products/{p.product.slug}" use:link class="flex items-center gap-2 font-medium hover:underline">{#if p.product.icon_url}<img src={p.product.icon_url} alt="" class="h-6 w-6 rounded" />{/if}{p.product.name}</a></td>
+                <td><a href="/products/{p.product.slug}" use:link class="flex items-center gap-2 font-medium hover:underline">{#if productIcon(p)}<img src={productIcon(p)} alt="" class="h-6 w-6 rounded" />{/if}{p.product.name}</a></td>
                 <td class="whitespace-nowrap">{#each p.apps as a}<span class="mr-1"><PlatformGlyph platform={a.platform} /></span>{/each}</td>
                 <td class="text-right tabular-nums">{fmtNum(p.totals.downloads)}<div class="text-xs text-zinc-400">{#each Object.entries(p.by_platform) as [k, v]}<span class="mr-1">{PLATFORM_LABEL[k]?.[0] || k[0]} {fmtCompact(v.downloads)}</span>{/each}</div></td>
                 <td class="text-right text-xs {deltaPct(p.totals.downloads, p.prev.downloads) > 0 ? 'text-emerald-600' : deltaPct(p.totals.downloads, p.prev.downloads) < 0 ? 'text-red-600' : 'text-zinc-400'}">{fmtPct(deltaPct(p.totals.downloads, p.prev.downloads))}</td>
@@ -161,6 +164,9 @@
           {#each reviews?.rows || [] as r}
             <li class="py-2"><a href="/reviews/{r.id}" use:link class="block hover:underline">
               <div class="flex items-center gap-2 text-xs text-zinc-500"><PlatformGlyph platform={r.platform} class="h-3 w-3" /><Stars rating={r.rating} /><span>{fmtDate(r.created_at)}</span></div>
+              <!-- Which app a review belongs to is the first thing you need; a
+                   star rating with no app name is unactionable. -->
+              <div class="mt-0.5 truncate text-xs font-medium text-zinc-700 dark:text-zinc-300">{r.app_name || '—'}</div>
               <div class="line-clamp-2 text-sm">{r.title || r.body || '(no text)'}</div>
             </a></li>
           {:else}<li class="py-6 text-center text-sm text-zinc-400">No reviews in range</li>{/each}
