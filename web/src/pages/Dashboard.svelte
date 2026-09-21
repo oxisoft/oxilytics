@@ -51,7 +51,10 @@
         api.get('/metrics/series' + qs({ ...p, metric: 'crashes', group: 'platform', bucket })),
         api.get('/metrics/countries' + qs({ ...p, limit: 10 })),
         api.get('/products' + qs({ from: p.from, to: p.to })),
-        api.get('/apps' + qs({ from: p.from, to: p.to })),
+        // Pass the whole filter, not just the dates: /apps honours platform and
+        // product_id too, and Top performers must obey the same bar as the
+        // KPIs above it.
+        api.get('/apps' + qs(p)),
         api.get('/reviews' + qs({ ...p, per_page: 5 })),
         api.get('/sync/status'),
       ]);
@@ -59,7 +62,7 @@
     finally { loading = false; }
   }
   onMount(load);
-  $effect(() => { filter.from; filter.to; filter.product; filter.platforms.length; bucket; load(); });
+  $effect(() => { filter.from; filter.to; filter.product; filter.platform; bucket; load(); });
 
   const hasData = $derived(summary && (summary.totals.downloads > 0 || summary.totals.updates > 0 || (summary.reviews?.count || 0) > 0 || (products || []).length > 0));
   const platformShare = $derived.by(() => {
@@ -132,18 +135,40 @@
           app whose numbers come from different stores, and the question here
           is which individual app actually pulls downloads.
         -->
+        {#snippet perfRow(a, muted)}
+          {#if a.icon_url}
+            <img src={a.icon_url} alt="" class="h-6 w-6 shrink-0 rounded" />
+          {:else}
+            <span class="grid h-6 w-6 shrink-0 place-items-center rounded bg-zinc-100 text-zinc-400 dark:bg-zinc-800"><Icon name="products" class="h-3 w-3" /></span>
+          {/if}
+          <PlatformGlyph platform={a.platform} class="h-3.5 w-3.5 shrink-0" />
+          <span class="truncate {muted ? 'text-zinc-500' : ''}" title={muted ? `${a.name} — not linked to a product` : a.name}>{a.name}</span>
+          <div class="ml-auto flex shrink-0 items-center gap-2">
+            <div class="hidden h-2 w-16 overflow-hidden rounded bg-zinc-100 sm:block dark:bg-zinc-800">
+              <div class="h-full {muted ? 'bg-zinc-400' : 'bg-brand-500'}" style="width:{topMax ? (a.downloads / topMax) * 100 : 0}%"></div>
+            </div>
+            <span class="w-12 text-right tabular-nums">{fmtCompact(a.downloads)}</span>
+          </div>
+        {/snippet}
+
         {#if topApps.length}
-          <ul class="flex-1 space-y-1.5 overflow-y-auto pr-1 text-sm">
+          <ul class="flex-1 space-y-0.5 overflow-y-auto pr-1 text-sm">
             {#each topApps as a (a.id)}
-              <li class="flex items-center gap-2">
-                <PlatformGlyph platform={a.platform} class="h-3.5 w-3.5 shrink-0" />
-                <span class="truncate" title={a.name}>{a.name}</span>
-                <div class="ml-auto flex shrink-0 items-center gap-2">
-                  <div class="hidden h-2 w-16 overflow-hidden rounded bg-zinc-100 sm:block dark:bg-zinc-800">
-                    <div class="h-full bg-brand-500" style="width:{topMax ? (a.downloads / topMax) * 100 : 0}%"></div>
+              <li>
+                <!--
+                  Apps that belong to a product link to that product; an app
+                  nobody has linked yet has nowhere to go, so it stays plain
+                  text rather than becoming a link that 404s.
+                -->
+                {#if a.product_id}
+                  <a href="/products/{a.product_id}" use:link class="-mx-1 flex items-center gap-2 rounded px-1 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                    {@render perfRow(a, false)}
+                  </a>
+                {:else}
+                  <div class="-mx-1 flex items-center gap-2 px-1 py-1">
+                    {@render perfRow(a, true)}
                   </div>
-                  <span class="w-12 text-right tabular-nums">{fmtCompact(a.downloads)}</span>
-                </div>
+                {/if}
               </li>
             {/each}
           </ul>

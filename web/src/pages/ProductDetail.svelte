@@ -38,7 +38,7 @@
     try {
       product = await api.get('/products/' + params.slug);
       filter.product = String(product.id);
-      if (params.platform) filter.platforms = [params.platform];
+      if (params.platform) filter.platform = params.platform;
       if (session.isAdmin) unassigned = await api.get('/apps?unassigned=1');
     } catch (e) { error = e.status === 404 ? 'Product not found' : e.message; }
   }
@@ -62,7 +62,7 @@
 
   onMount(loadProduct);
   $effect(() => { params.slug; loadProduct(); });
-  $effect(() => { product; filter.from; filter.to; filter.platforms.length; loadData(); });
+  $effect(() => { product; filter.from; filter.to; filter.platform; loadData(); });
 
   function chartSeries(s) {
     if (!s?.series) return [];
@@ -102,7 +102,7 @@
         {#each ['ios', 'android', 'windows'] as plat}
           {@const a = product.apps.find((x) => x.platform === plat || (plat === 'ios' && x.platform === 'macos'))}
           {#if a}
-            <button class="badge gap-1 border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 {filter.platforms.includes(a.platform) ? 'bg-zinc-100 dark:bg-zinc-800' : ''}" onclick={() => filter.togglePlatform(a.platform)}>
+            <button class="badge gap-1 border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 {filter.platform === a.platform ? 'bg-zinc-100 dark:bg-zinc-800' : ''}" onclick={() => filter.setPlatform(filter.platform === a.platform ? '' : a.platform)}>
               <PlatformGlyph platform={a.platform} class="h-3 w-3" />{PLATFORM_LABEL[a.platform]}{#if a.rating_avg}<span class="text-amber-500">★ {fmtRating(a.rating_avg)}</span>{/if}
             </button>
           {:else}

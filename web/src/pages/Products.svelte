@@ -58,7 +58,7 @@
   // (non-reactive) flag to skip the initial run that onMount already covers.
   let filterKey = null;
   $effect(() => {
-    const key = [filter.from, filter.to, filter.platforms.join(','), filter.product].join('|');
+    const key = [filter.from, filter.to, filter.platform, filter.product].join('|');
     if (filterKey === null) { filterKey = key; return; }  // onMount already loaded
     if (key === filterKey) return;                         // nothing actually changed
     filterKey = key;

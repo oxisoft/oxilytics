@@ -20,7 +20,7 @@ export function rangeFor(preset, today = new Date()) {
 
 class Filter {
   product = $state('');     // product id or ''
-  platforms = $state([]);   // [] = all
+  platform = $state('');    // single platform, '' = all
   preset = $state('30d');
   from = $state(rangeFor('30d').from);
   to = $state(rangeFor('30d').to);
@@ -28,7 +28,7 @@ class Filter {
   get params() {
     return {
       product_id: this.product || undefined,
-      platform: this.platforms.length ? this.platforms.join(',') : undefined,
+      platform: this.platform || undefined,
       from: this.from,
       to: this.to,
     };
@@ -51,8 +51,8 @@ class Filter {
     this.sync();
   }
 
-  togglePlatform(p) {
-    this.platforms = this.platforms.includes(p) ? this.platforms.filter((x) => x !== p) : [...this.platforms, p];
+  setPlatform(p) {
+    this.platform = p || '';
     this.sync();
   }
 
@@ -62,18 +62,25 @@ class Filter {
   sync() {
     const q = new URLSearchParams();
     if (this.product) q.set('product', this.product);
-    if (this.platforms.length) q.set('platform', this.platforms.join(','));
+    if (this.platform) q.set('platform', this.platform);
     q.set('range', this.preset);
     if (this.preset === 'custom') { q.set('from', this.from); q.set('to', this.to); }
     const loc = get(location);
     history.replaceState(null, '', '#' + loc + '?' + q.toString());
   }
 
-  // read from the hash query on load
+  // Read from the hash query on load.
+  //
+  // The filter is a singleton shared by every page, so absent parameters must
+  // RESET the state rather than leave whatever the last page set. Only
+  // assigning when a key is present meant a filter stayed applied after
+  // navigating to a URL that does not carry it.
   load() {
     const q = new URLSearchParams(get(querystring) || '');
-    if (q.get('product')) this.product = q.get('product');
-    if (q.get('platform')) this.platforms = q.get('platform').split(',').filter(Boolean);
+    this.product = q.get('product') || '';
+    // Older links carried a comma-separated platform list. Keep them working by
+    // taking the first entry rather than dropping the filter silently.
+    this.platform = (q.get('platform') || '').split(',').filter(Boolean)[0] || '';
     const r = q.get('range');
     if (r === 'custom' && q.get('from') && q.get('to')) {
       this.preset = 'custom'; this.from = q.get('from'); this.to = q.get('to');
