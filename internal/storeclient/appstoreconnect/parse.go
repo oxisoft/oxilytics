@@ -11,11 +11,28 @@ import (
 )
 
 // Report names we consume.
+//
+// These are Apple's exact report names, verified against the live
+// analyticsReports endpoint — not the names shown in the App Store Connect
+// web UI, which differ. Apple offers a "Standard" and a "Detailed" variant of
+// the download and install reports; we take Standard because it is produced
+// DAILY, whereas Detailed is only WEEKLY/MONTHLY. Detailed adds just three
+// attribution columns (Source Info, Campaign, Page Title), which are empty for
+// apps that run no ad campaigns, so it would cost daily resolution and
+// historical depth to gain nothing.
+//
+// Getting a name wrong is silent: Apple simply does not list that report and
+// every sync stores zero rows while reporting success. reportNameUnknown below
+// turns that into a hard error for exactly this reason.
 const (
-	ReportDownloads = "App Store Downloads"
-	ReportInstalls  = "App Store Installation and Deletion"
+	ReportDownloads = "App Downloads Standard"
+	ReportInstalls  = "App Store Installation and Deletion Standard"
 	ReportCrashes   = "App Crashes"
 )
+
+// AllReportNames is every report this ingester asks Apple for. Used to verify
+// up front that Apple still offers each one under the expected name.
+var AllReportNames = []string{ReportDownloads, ReportInstalls, ReportCrashes}
 
 // Row is one parsed line of an analytics report, normalised to our metrics.
 type Row struct {
@@ -90,36 +107,40 @@ func ParseReport(data []byte) ([]Row, error) {
 		if row.Date == "" {
 			continue
 		}
-		// App Store Downloads: "Download Type" ∈ First-time download / Redownload / Update ... with Counts
-		if dt := strings.ToLower(get(rec, "download type")); dt != "" {
+		// Order matters. The Installation and Deletion report carries BOTH an
+		// "Event" column (Install/Delete) and a "Download Type" column
+		// describing how the app arrived. Checking Download Type first
+		// silently filed every install under "updates" and lost deletions
+		// entirely, so Event is checked first and wins.
+		if et := strings.ToLower(get(rec, "event")); et != "" {
+			n := num(rec, "counts", "count")
+			if strings.HasPrefix(et, "delet") {
+				row.Deletions = n
+			} else {
+				row.Installs = n
+			}
+		} else if dt := strings.ToLower(get(rec, "download type")); dt != "" {
+			// Downloads report: one row per download type, with Counts.
 			n := num(rec, "counts", "count", "downloads")
 			switch {
 			case strings.HasPrefix(dt, "first"):
 				row.Downloads = n
 			case strings.HasPrefix(dt, "redownload"):
 				row.Redownloads = n
-			case strings.HasPrefix(dt, "update"):
+			case strings.HasPrefix(dt, "auto-update"), strings.HasPrefix(dt, "manual update"), strings.HasPrefix(dt, "update"):
 				row.Updates = n
 			default:
 				row.Downloads = n
 			}
 		} else {
-			// Column-per-metric shapes (installs/deletions, crashes)
+			// Column-per-metric shapes (crashes, and any report that puts each
+			// metric in its own column rather than one row per event type).
 			row.Downloads = num(rec, "first-time downloads", "first time downloads")
 			row.Redownloads = num(rec, "redownloads")
 			row.Updates = num(rec, "updates")
 			row.Installs = num(rec, "installations", "installs")
 			row.Deletions = num(rec, "deletions", "uninstalls")
 			row.Crashes = num(rec, "crashes", "crash count")
-			if et := strings.ToLower(get(rec, "event")); et != "" {
-				// Installation and Deletion report: Event ∈ Install / Delete with Counts
-				n := num(rec, "counts", "count")
-				if strings.HasPrefix(et, "delet") {
-					row.Deletions = n
-				} else {
-					row.Installs = n
-				}
-			}
 		}
 		rows = append(rows, row)
 	}

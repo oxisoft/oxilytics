@@ -138,7 +138,7 @@ func TestAppsReviewsAndReports(t *testing.T) {
 	if err != nil || len(reps) != 1 {
 		t.Fatalf("reports: %v %+v", err, reps)
 	}
-	insts, err := c.Instances(ctx, "rep1")
+	insts, err := c.Instances(ctx, "rep1", GranularityDaily)
 	if err != nil || len(insts) != 1 || insts[0].ProcessingDate != "2026-09-02" {
 		t.Fatalf("instances: %v %+v", err, insts)
 	}

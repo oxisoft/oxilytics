@@ -40,6 +40,17 @@ type ConcurrentIngester interface {
 	AppConcurrency() int
 }
 
+// SelfCheckingIngester lets an ingester validate its own assumptions about the
+// upstream API once per run, before any app is synced.
+//
+// Added after a silent failure that lasted months: the App Store ingester asked
+// Apple for report names that do not exist, so every run finished "successfully"
+// having stored nothing. A run that cannot possibly collect data should fail,
+// not succeed quietly.
+type SelfCheckingIngester interface {
+	VerifyReportNames(ctx context.Context, rc *RunContext, apps []models.App) error
+}
+
 // Engine owns running syncs.
 type Engine struct {
 	db        *store.DB
@@ -238,6 +249,15 @@ func (e *Engine) execute(ctx context.Context, in Ingester, h *runHandle) {
 	if err := e.db.StartSyncRun(bg, run.ID, rc.From, rc.To, len(apps)); err != nil {
 		e.finish(run, models.SyncFailed, err, rc.Stats)
 		return
+	}
+	// Fail fast if the upstream API no longer matches our assumptions, rather
+	// than syncing 19 apps and reporting success with an empty database.
+	if sc, ok := in.(SelfCheckingIngester); ok {
+		if err := sc.VerifyReportNames(ctx, rc, apps); err != nil {
+			log("error", nil, "%v", err)
+			e.finish(run, statusFor(ctx, err), err, rc.Stats)
+			return
+		}
 	}
 	log("info", nil, "%d active apps", len(apps))
 

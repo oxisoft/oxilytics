@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +33,7 @@ type Client interface {
 	ReportRequests(ctx context.Context, appID string) ([]appstoreconnect.ReportRequest, error)
 	CreateReportRequest(ctx context.Context, appID string, access appstoreconnect.AccessType) (*appstoreconnect.ReportRequest, error)
 	Reports(ctx context.Context, requestID, name string) ([]appstoreconnect.Report, error)
-	Instances(ctx context.Context, reportID string) ([]appstoreconnect.Instance, error)
+	Instances(ctx context.Context, reportID, granularity string) ([]appstoreconnect.Instance, error)
 	SegmentURLs(ctx context.Context, instanceID string) ([]string, error)
 	DownloadSegment(ctx context.Context, url string) ([]byte, error)
 }
@@ -87,6 +89,65 @@ func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]m
 	return rc.DB.ListApps(ctx, store.AppFilter{Store: models.StoreAppStore})
 }
 
+// VerifyReportNames checks that Apple still offers every report we ask for,
+// once per run, and fails the run loudly if one is unknown everywhere.
+//
+// This exists because of a real and expensive failure: the constants named
+// "App Store Downloads" and "App Store Installation and Deletion", which Apple
+// does not publish under those names. Every sync then completed "successfully"
+// with zero rows for months, and the logs said "report not available" — which
+// reads like a fact about the app rather than a typo in our code.
+//
+// A per-app absence is legitimate (unreleased apps, reports Apple does not
+// produce for that title), so the check passes as soon as ANY app offers the
+// name. Only a name that no app recognises is treated as a bug.
+func (in *Ingester) VerifyReportNames(ctx context.Context, rc *osync.RunContext, apps []models.App) error {
+	unknown := map[string]bool{}
+	for _, n := range appstoreconnect.AllReportNames {
+		unknown[n] = true
+	}
+	checked := 0
+	for _, app := range apps {
+		if len(unknown) == 0 || checked >= 5 || ctx.Err() != nil {
+			break
+		}
+		reqs, err := in.c.ReportRequests(ctx, app.StoreAppID)
+		if err != nil || len(reqs) == 0 {
+			continue
+		}
+		var probed bool
+		for _, r := range reqs {
+			if r.Stopped {
+				continue
+			}
+			for name := range unknown {
+				reps, err := in.c.Reports(ctx, r.ID, name)
+				if err == nil && len(reps) > 0 {
+					delete(unknown, name)
+					probed = true
+				}
+			}
+		}
+		if probed {
+			checked++
+		}
+	}
+	if len(unknown) == 0 || checked == 0 {
+		// Either everything resolved, or no app had a usable request yet and
+		// there is nothing to conclude.
+		return nil
+	}
+	var names []string
+	for n := range unknown {
+		names = append(names, strconv.Quote(n))
+	}
+	sort.Strings(names)
+	return &osync.FatalError{Err: fmt.Errorf(
+		"Apple offers no report named %s for any app — the names in "+
+			"internal/storeclient/appstoreconnect/parse.go are wrong or Apple renamed them; "+
+			"syncing would silently store zero rows", strings.Join(names, ", "))}
+}
+
 func (in *Ingester) SyncApp(ctx context.Context, rc *osync.RunContext, app models.App) error {
 	var errs []error
 	if err := in.syncReports(ctx, rc, app); err != nil {
@@ -114,11 +175,11 @@ func isFatal(err error) bool {
 // reports --------------------------------------------------------------------
 
 func (in *Ingester) syncReports(ctx context.Context, rc *osync.RunContext, app models.App) error {
-	reqID, err := in.reportRequest(ctx, rc, app)
+	reqIDs, err := in.reportRequests(ctx, rc, app)
 	if err != nil {
 		return err
 	}
-	if reqID == "" {
+	if len(reqIDs) == 0 {
 		rc.Log("warn", &app.ID, "no analytics report request available yet; skipping reports")
 		return nil
 	}
@@ -142,14 +203,50 @@ func (in *Ingester) syncReports(ctx context.Context, rc *osync.RunContext, app m
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		maxDay, n, err := in.ingestReport(ctx, rc, app, reqID, s.name, s.from, s.cols)
-		if err != nil {
-			if errors.Is(err, storeclient.ErrNotFound) {
-				rc.Log("warn", &app.ID, "report %q not available", s.name)
-				continue
+		// Read every report request, not just one.
+		//
+		// The two request types carry different data and neither is a superset:
+		// a ONE_TIME_SNAPSHOT instance holds the app's full history in a single
+		// file (measured: 163 days in one), while an ONGOING instance holds
+		// only the last day or two but keeps arriving daily. Using ONGOING
+		// alone — the old behaviour for delta runs — meant history could never
+		// be backfilled no matter how often we synced.
+		//
+		// Upserts are keyed on (app, day, country), so overlapping days from
+		// both sources converge on the same rows rather than double-counting.
+		var (
+			maxDay   string
+			total    int64
+			anyFound bool
+			lastErr  error
+		)
+		for _, reqID := range reqIDs {
+			day, n, err := in.ingestReport(ctx, rc, app, reqID, s.name, s.from, s.cols)
+			if err != nil {
+				if errors.Is(err, storeclient.ErrNotFound) {
+					lastErr = err
+					continue
+				}
+				return fmt.Errorf("%s: %w", s.name, err)
 			}
-			return fmt.Errorf("%s: %w", s.name, err)
+			anyFound = true
+			total += n
+			maxDay = osync.MaxDay(maxDay, day)
 		}
+		// A report may be genuinely absent for one app — Apple does not offer
+		// crash reports for every title, and a brand-new app has none of them
+		// yet. What must never pass silently is a name that NO app recognises,
+		// which is what "App Store Downloads" was: a typo that cost months of
+		// data while every sync reported success.
+		//
+		// So: absent for this app is a warning, absent everywhere is fatal,
+		// and the distinction is drawn in VerifyReportNames at run start rather
+		// than guessed at per app.
+		if !anyFound && lastErr != nil {
+			rc.Log("warn", &app.ID, "Apple offers no %q report for this app", s.name)
+			continue
+		}
+		n := total
 		rc.Log("info", &app.ID, "%s: %d rows through %s", s.name, n, maxDay)
 		if maxDay != "" {
 			if err := rc.DB.SetCheckpoint(ctx, nil, models.StoreAppStore, s.source, app.ID, osync.MaxDay(maxDay, checkpointFor(s.source, cpMetrics, cpCrashes))); err != nil {
@@ -167,15 +264,23 @@ func checkpointFor(source, cpMetrics, cpCrashes string) string {
 	return cpMetrics
 }
 
-// reportRequest finds or creates the request we read from. Full runs create a
-// ONE_TIME_SNAPSHOT and wait for it; delta runs use (or create) ONGOING.
-func (in *Ingester) reportRequest(ctx context.Context, rc *osync.RunContext, app models.App) (string, error) {
+// reportRequests returns every request worth reading, newest data last.
+//
+// Both types are returned because they carry different things: the
+// ONE_TIME_SNAPSHOT is a single file with the app's whole history, the ONGOING
+// request produces a fresh file each day but only covers recent days. A sync
+// that reads only one of them either never backfills or never updates.
+//
+// A snapshot is requested on any run that lacks one, not just full runs: an app
+// added later would otherwise never get its history, and Apple produces the
+// snapshot asynchronously anyway, so a later run picks it up for free.
+func (in *Ingester) reportRequests(ctx context.Context, rc *osync.RunContext, app models.App) ([]string, error) {
 	reqs, err := in.c.ReportRequests(ctx, app.StoreAppID)
 	if err != nil {
 		if errors.Is(err, storeclient.ErrForbidden) {
-			return "", &osync.FatalError{Err: fmt.Errorf("analytics reports forbidden — API key needs App Manager/Admin role: %w", err)}
+			return nil, &osync.FatalError{Err: fmt.Errorf("analytics reports forbidden — API key needs App Manager/Admin role: %w", err)}
 		}
-		return "", err
+		return nil, err
 	}
 	var ongoing, snapshot string
 	for _, r := range reqs {
@@ -189,45 +294,14 @@ func (in *Ingester) reportRequest(ctx context.Context, rc *osync.RunContext, app
 			snapshot = r.ID
 		}
 	}
-	if rc.Mode == models.SyncFull {
-		if snapshot == "" {
-			r, err := in.c.CreateReportRequest(ctx, app.StoreAppID, appstoreconnect.AccessOneTime)
-			if err != nil {
-				return "", fmt.Errorf("create snapshot request: %w", err)
-			}
+	if snapshot == "" {
+		r, err := in.c.CreateReportRequest(ctx, app.StoreAppID, appstoreconnect.AccessOneTime)
+		if err != nil {
+			// Not fatal: ongoing data still flows, we just have no history yet.
+			rc.Log("warn", &app.ID, "create ONE_TIME_SNAPSHOT request: %v", err)
+		} else {
 			snapshot = r.ID
-			rc.Log("info", &app.ID, "requested ONE_TIME_SNAPSHOT %s; Apple may take hours to produce it", snapshot)
-		}
-		// Give Apple a short grace period, then move on.
-		//
-		// Blocking here for hours was pointless: the request id is persisted
-		// and re-found by ReportRequests on the next run, so waiting buys
-		// nothing that patience across runs does not. Worse, the wait was per
-		// app and the loop is sequential, so N apps without a ready snapshot
-		// cost N × SnapshotWait — 19 apps × 4h = 76h for a single full sync,
-		// during which no other app was even attempted.
-		deadline := time.Now().Add(in.SnapshotGrace)
-		ready := false
-		for {
-			reps, err := in.c.Reports(ctx, snapshot, appstoreconnect.ReportDownloads)
-			if err == nil && len(reps) > 0 {
-				if insts, err := in.c.Instances(ctx, reps[0].ID); err == nil && len(insts) > 0 {
-					ready = true
-					break
-				}
-			}
-			if !time.Now().Before(deadline) {
-				break
-			}
-			select {
-			case <-time.After(in.PollEvery):
-			case <-ctx.Done():
-				return "", ctx.Err()
-			}
-		}
-		if !ready {
-			rc.Log("info", &app.ID, "snapshot not ready yet; Apple is still generating it. Historical data will be picked up automatically on a later run — no action needed")
-			snapshot = ""
+			rc.Log("info", &app.ID, "requested ONE_TIME_SNAPSHOT %s for historical backfill; Apple produces it asynchronously and a later run will pick it up", snapshot)
 		}
 	}
 	if ongoing == "" {
@@ -242,13 +316,24 @@ func (in *Ingester) reportRequest(ctx context.Context, rc *osync.RunContext, app
 	if ongoing != "" {
 		_ = rc.DB.SetCheckpoint(ctx, nil, models.StoreAppStore, srcRequest, app.ID, ongoing)
 	}
-	if rc.Mode == models.SyncFull && snapshot != "" {
-		return snapshot, nil
+	// Snapshot first so its historical rows land before the ongoing file's
+	// recent days; both upsert on the same key, so order only affects logs.
+	var out []string
+	for _, id := range []string{snapshot, ongoing} {
+		if id != "" {
+			out = append(out, id)
+		}
 	}
-	return ongoing, nil
+	return out, nil
 }
 
-// ingestReport downloads every daily instance of a report newer than `from`.
+// ingestReport downloads every instance of a report newer than `from`.
+//
+// Apple publishes a given report at exactly one granularity — downloads are
+// DAILY, installs and deletions only WEEKLY — and asking for the wrong one
+// returns an empty list rather than an error. So each granularity is tried in
+// turn and the first that has instances wins. Hardcoding DAILY meant the
+// install report was never fetched at all.
 func (in *Ingester) ingestReport(ctx context.Context, rc *osync.RunContext, app models.App, reqID, name, from string, cols store.MetricCols) (string, int64, error) {
 	reps, err := in.c.Reports(ctx, reqID, name)
 	if err != nil {
@@ -257,9 +342,21 @@ func (in *Ingester) ingestReport(ctx context.Context, rc *osync.RunContext, app 
 	if len(reps) == 0 {
 		return "", 0, storeclient.ErrNotFound
 	}
-	insts, err := in.c.Instances(ctx, reps[0].ID)
-	if err != nil {
-		return "", 0, err
+	var insts []appstoreconnect.Instance
+	for _, g := range appstoreconnect.PreferredGranularities {
+		got, err := in.c.Instances(ctx, reps[0].ID, g)
+		if err != nil {
+			return "", 0, err
+		}
+		if len(got) > 0 {
+			insts = got
+			break
+		}
+	}
+	if len(insts) == 0 {
+		// The report exists but Apple has produced no files for it yet.
+		// Normal for a new app or a report type with no activity.
+		return "", 0, nil
 	}
 	var total int64
 	maxDay := ""
@@ -327,6 +424,10 @@ func toMetricDays(appID int64, rows []appstoreconnect.Row, from string) []models
 			tgt.Updates += r.Updates
 			tgt.Uninstalls += r.Deletions
 			tgt.Crashes += r.Crashes
+			// Apple's install events are a re-download onto a new device, not
+			// a first-time download, so they are folded into redownloads
+			// rather than inflating the downloads figure.
+			tgt.Redownloads += r.Installs
 		}
 	}
 	out := make([]models.MetricDay, 0, len(acc))

@@ -446,9 +446,28 @@ type instanceResource struct {
 	} `json:"attributes"`
 }
 
-// Instances lists DAILY instances for a report.
-func (c *Client) Instances(ctx context.Context, reportID string) ([]Instance, error) {
-	q := url.Values{"filter[granularity]": {"DAILY"}, "limit": {"200"}}
+// Granularities Apple produces report instances at, in the order we prefer
+// them. A report exists at exactly one of these in practice: downloads are
+// DAILY, installs/deletions only WEEKLY. Asking for the wrong one returns an
+// empty list rather than an error, which is why this must be tried in order
+// instead of assumed.
+const (
+	GranularityDaily   = "DAILY"
+	GranularityWeekly  = "WEEKLY"
+	GranularityMonthly = "MONTHLY"
+)
+
+// PreferredGranularities is the order to try. Finest first: a daily file gives
+// per-day resolution, while a weekly file still carries per-day rows inside it
+// but is published once a week.
+var PreferredGranularities = []string{GranularityDaily, GranularityWeekly, GranularityMonthly}
+
+// Instances lists report instances at one granularity.
+func (c *Client) Instances(ctx context.Context, reportID, granularity string) ([]Instance, error) {
+	if granularity == "" {
+		granularity = GranularityDaily
+	}
+	q := url.Values{"filter[granularity]": {granularity}, "limit": {"200"}}
 	rs, err := getAll[instanceResource](ctx, c, "/v1/analyticsReports/"+reportID+"/instances", q, 0)
 	if err != nil {
 		return nil, err

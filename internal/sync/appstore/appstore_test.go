@@ -15,9 +15,10 @@ import (
 )
 
 type mock struct {
-	created  []appstoreconnect.AccessType
-	requests []appstoreconnect.ReportRequest
-	segments map[string]string // report name → TSV
+	created     []appstoreconnect.AccessType
+	requests    []appstoreconnect.ReportRequest
+	segments    map[string]string // report name → TSV
+	granularity map[string]string // report name → the ONE granularity Apple offers
 }
 
 func (m *mock) Apps(ctx context.Context) ([]appstoreconnect.App, error) {
@@ -55,8 +56,21 @@ func (m *mock) Reports(ctx context.Context, requestID, name string) ([]appstorec
 	}
 	return []appstoreconnect.Report{{ID: "rep|" + name, Name: name}}, nil
 }
-func (m *mock) Instances(ctx context.Context, reportID string) ([]appstoreconnect.Instance, error) {
-	return []appstoreconnect.Instance{{ID: "inst|" + reportID, Granularity: "DAILY", ProcessingDate: "2026-09-03"}}, nil
+
+// Instances mirrors Apple's real behaviour: a report exists at exactly one
+// granularity, and asking for any other returns an empty list rather than an
+// error. The old mock returned DAILY for everything, which is why the
+// hardcoded-DAILY bug passed its tests while collecting nothing in production.
+func (m *mock) Instances(ctx context.Context, reportID, granularity string) ([]appstoreconnect.Instance, error) {
+	name := strings.TrimPrefix(reportID, "rep|")
+	want := m.granularity[name]
+	if want == "" {
+		want = "DAILY"
+	}
+	if granularity != want {
+		return nil, nil
+	}
+	return []appstoreconnect.Instance{{ID: "inst|" + reportID, Granularity: want, ProcessingDate: "2026-09-03"}}, nil
 }
 func (m *mock) SegmentURLs(ctx context.Context, instanceID string) ([]string, error) {
 	return []string{"seg|" + instanceID}, nil
