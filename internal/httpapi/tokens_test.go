@@ -30,16 +30,25 @@ func login(t *testing.T, c *client) {
 	}
 }
 
-// mintToken creates a token through the API and returns its plaintext.
+// mintToken creates a read-only token through the API and returns its plaintext.
 func mintToken(t *testing.T, c *client, name string) string {
 	t.Helper()
-	code, out := c.do("POST", "/api/me/tokens", map[string]string{"name": name})
+	return mintTokenWith(t, c, name, false)
+}
+
+// mintTokenWith creates a token, optionally granting the run-sync capability.
+func mintTokenWith(t *testing.T, c *client, name string, canRunSync bool) string {
+	t.Helper()
+	code, out := c.do("POST", "/api/me/tokens", map[string]any{"name": name, "can_run_sync": canRunSync})
 	if code != 201 {
 		t.Fatalf("create token: %d %v", code, out)
 	}
 	tok, _ := out["token"].(string)
 	if tok == "" {
 		t.Fatal("no plaintext token in create response")
+	}
+	if got, _ := out["can_run_sync"].(bool); got != canRunSync {
+		t.Fatalf("can_run_sync round-trip: want %v got %v", canRunSync, got)
 	}
 	return tok
 }

@@ -249,8 +249,19 @@ func randomCode() (string, error) {
 // CSRF -----------------------------------------------------------------------
 
 // RequireFetchHeader rejects mutating requests without X-Requested-With: fetch.
+//
+// Token-authenticated requests are exempt. The header defends against CSRF,
+// which exists because browsers attach cookies to cross-site requests
+// automatically. A Bearer token is never attached automatically by anything,
+// so a hostile page cannot forge an authenticated token request no matter what
+// headers it sets. Demanding the header from API clients would add a ritual
+// with no security value and break every straightforward curl or script.
 func RequireFetchHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, viaToken := TokenFrom(r.Context()); viaToken {
+			next.ServeHTTP(w, r)
+			return
+		}
 		switch r.Method {
 		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 			if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Requested-With")), []byte("fetch")) != 1 {

@@ -18,19 +18,39 @@ Dates in query params are `YYYY-MM-DD` in `OXI_TZ`.
 | POST | `/me/totp/enable` | any | `{code}` → recovery codes (shown once) |
 | DELETE | `/me/totp` | any | `{password}` |
 
-## API tokens (read-only)
+## API tokens
 
 Tokens let scripts and integrations read analytics without a browser session.
-They are **read-only by construction**: the router allows only `GET`/`HEAD`/`OPTIONS`
+They are **read-only by default**: the router allows only `GET`/`HEAD`/`OPTIONS`
 for token-authenticated requests, so a token cannot write even when its owner is
 an admin, and a write endpoint added later is denied by default.
+
+A token may be granted one narrow capability at creation, and only that one:
+
+| Capability | Grants | Does not grant |
+|---|---|---|
+| `can_run_sync` | `POST /api/sync/runs` — start a sync that is already configured | cancelling or resetting a run, changing any setting, anything else |
+
+Capabilities are chosen when the token is created and are **fixed for its
+lifetime** — there is no endpoint to edit them, so what a token can do is
+knowable from its creation record. A capability can never exceed its owner:
+creating a sync-capable token requires the `run_sync` permission, and the sync
+route re-checks that permission on every call.
 
 Use the `Authorization` header. Tokens in query strings are not accepted, because
 they leak into access logs, browser history and `Referer` headers.
 
 ```
-curl -H "Authorization: Bearer oxi_…" https://analytics.example.com/api/products
+curl -H "Authorization: Bearer ***" https://analytics.example.com/api/products
+
+curl -X POST -H "Authorization: Bearer ***" -H "Content-Type: application/json" \
+  -d '{"store":"appstore","mode":"delta"}' \
+  https://analytics.example.com/api/sync/runs
 ```
+
+The `X-Requested-With` CSRF header is **not** required for token requests. That
+header exists because browsers attach cookies automatically; a Bearer token
+never is, so a hostile page cannot forge an authenticated token call.
 
 - Owned by the user who created them; deleting or disabling that user revokes them.
 - Only a SHA-256 hash is stored. The plaintext is shown once at creation and cannot be recovered.
@@ -41,12 +61,13 @@ curl -H "Authorization: Bearer oxi_…" https://analytics.example.com/api/produc
 | Method | Path | Role | Notes |
 |--------|------|------|-------|
 | GET | `/me/tokens` | any (session only) | list own tokens; never returns plaintext |
-| POST | `/me/tokens` | any (session only) | `{name}` → `201 {…, token}` — the only time plaintext is returned |
+| POST | `/me/tokens` | any (session only) | `{name, can_run_sync?}` → `201 {…, token}` — the only time plaintext is returned |
 | DELETE | `/me/tokens/{id}` | any (session only) | revoke; takes effect immediately |
 
 Failure modes: `401 invalid_token` (unknown, revoked, or owner disabled),
-`403 read_only_token` (write attempted with a token),
-`403 session_required` (token used on a session-only endpoint).
+`403 read_only_token` (write attempted with a token that lacks the capability),
+`403 session_required` (token used on a session-only endpoint),
+`422` on creation when requesting a capability the owner does not have.
 
 ## Users (admin)
 | GET | `/users` | list |

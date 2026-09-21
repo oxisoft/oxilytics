@@ -9,6 +9,7 @@ import (
 
 	"github.com/oxisoft/oxilytics/internal/auth"
 	"github.com/oxisoft/oxilytics/internal/models"
+	"github.com/oxisoft/oxilytics/internal/permissions"
 	"github.com/oxisoft/oxilytics/internal/store"
 )
 
@@ -32,7 +33,8 @@ func (a *API) listTokens(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) createToken(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name string `json:"name"`
+		Name       string `json:"name"`
+		CanRunSync bool   `json:"can_run_sync"`
 	}
 	if err := decode(r, &body); err != nil {
 		badRequest(w, err.Error())
@@ -48,17 +50,27 @@ func (a *API) createToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	u := auth.UserFromContext(r.Context())
+	// A token can never exceed its owner. Refusing loudly here beats issuing a
+	// token whose advertised capability silently fails at every call.
+	if body.CanRunSync && !permissions.Can(u, permissions.RunSync) {
+		writeFieldErrs(w, map[string]string{
+			"can_run_sync": "your account is not allowed to run syncs, so a token cannot be either",
+		})
+		return
+	}
+
 	plaintext, hash, err := auth.GenerateToken()
 	if err != nil {
 		internalErr(w, err)
 		return
 	}
-	u := auth.UserFromContext(r.Context())
 	tok := &models.APIToken{
-		UserID: u.ID,
-		Name:   body.Name,
-		Hash:   hash,
-		Prefix: plaintext[:auth.PrefixLen],
+		UserID:     u.ID,
+		Name:       body.Name,
+		Hash:       hash,
+		Prefix:     plaintext[:auth.PrefixLen],
+		CanRunSync: body.CanRunSync,
 	}
 	if err := a.DB.CreateAPIToken(r.Context(), tok); err != nil {
 		internalErr(w, err)

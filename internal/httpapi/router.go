@@ -141,26 +141,58 @@ func (a *API) requireSession(next http.Handler) http.Handler {
 	})
 }
 
-// readOnlyForTokens rejects any non-read request made with an API token.
+// readOnlyForTokens rejects any non-read request made with an API token,
+// except the narrow set of capabilities explicitly granted to that token.
 //
 // Enforced here as a blanket method check rather than per handler: a new write
 // endpoint added later is denied by default, which is the opposite of the
 // usual failure mode where someone forgets to annotate a route. The method
 // whitelist is the guarantee — tokens can never write, whatever the owner's
 // role is or becomes.
+//
+// Capabilities are an allowlist of exact method+path pairs, not a role. A
+// capability must name precisely one endpoint, so granting one can never widen
+// into another: "can run a sync" means POST /api/sync/runs and nothing else.
+// Matching is on the routing pattern rather than the raw URL so that path
+// parameters cannot be used to slip past it.
 func (a *API) readOnlyForTokens(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, viaToken := auth.TokenFrom(r.Context()); viaToken {
-			switch r.Method {
-			case http.MethodGet, http.MethodHead, http.MethodOptions:
-			default:
-				writeErr(w, http.StatusForbidden, "read_only_token",
-					"API tokens are read-only; use the web interface to make changes")
-				return
-			}
+		tok, viaToken := auth.TokenFrom(r.Context())
+		if !viaToken {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+		if tok.CanRunSync && isSyncStart(r) {
+			// The route itself still applies permissions.RunSync, so a token
+			// cannot exceed what its owner is allowed to do.
+			next.ServeHTTP(w, r)
+			return
+		}
+		writeErr(w, http.StatusForbidden, "read_only_token",
+			"API tokens are read-only; use the web interface to make changes")
 	})
+}
+
+// isSyncStart matches exactly POST /api/sync/runs — the collection endpoint
+// that starts a run. It must not match POST /api/sync/runs/{id}/cancel or
+// /api/sync/reset, which are separate powers nobody granted.
+//
+// The raw path is used deliberately. chi's RoutePattern() is only resolved
+// once routing reaches the final handler; inside a group middleware it still
+// returns the partial pattern (/api/*), which silently matches nothing. The
+// path is normalised with path.Clean first so that /api/sync/runs/ and
+// /api/sync/runs/../runs cannot produce a different answer here than the
+// router will reach.
+func isSyncStart(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	return path.Clean(r.URL.Path) == "/api/sync/runs"
 }
 
 func (a *API) requireConfigured(next http.Handler) http.Handler {

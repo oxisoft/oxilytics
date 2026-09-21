@@ -158,6 +158,7 @@ Lets a delta run skip bucket objects that did not change.
 | token_hash | SHA-256 of the plaintext, UNIQUE; plaintext is never stored |
 | prefix | first characters (`oxi_` + 6) for display, so a token is recognisable without being exposed |
 | created_at, last_used_at, revoked_at | `revoked_at IS NULL` means active; revoked rows are kept as an audit trail |
+| can_run_sync | opt-in capability, `NOT NULL DEFAULT 0`; permits only `POST /api/sync/runs`. Fixed at creation — no code path updates it, so a token's powers cannot change after it is issued |
 
 SHA-256 rather than bcrypt: the token is 256 bits of CSPRNG output with no
 guessable structure, and it is verified on every request where a deliberately

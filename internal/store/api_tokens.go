@@ -8,13 +8,13 @@ import (
 	"github.com/oxisoft/oxilytics/internal/models"
 )
 
-const tokenCols = `id, user_id, name, token_hash, prefix, created_at, last_used_at, revoked_at`
+const tokenCols = `id, user_id, name, token_hash, prefix, created_at, last_used_at, revoked_at, can_run_sync`
 
 func scanToken(sc interface{ Scan(...any) error }) (*models.APIToken, error) {
 	var t models.APIToken
 	var created string
 	var lastUsed, revoked sql.NullString
-	if err := sc.Scan(&t.ID, &t.UserID, &t.Name, &t.Hash, &t.Prefix, &created, &lastUsed, &revoked); err != nil {
+	if err := sc.Scan(&t.ID, &t.UserID, &t.Name, &t.Hash, &t.Prefix, &created, &lastUsed, &revoked, &t.CanRunSync); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
@@ -29,8 +29,8 @@ func scanToken(sc interface{ Scan(...any) error }) (*models.APIToken, error) {
 func (d *DB) CreateAPIToken(ctx context.Context, t *models.APIToken) error {
 	now := fmtTime(time.Now())
 	res, err := d.w.ExecContext(ctx,
-		`INSERT INTO api_tokens (user_id, name, token_hash, prefix, created_at) VALUES (?,?,?,?,?)`,
-		t.UserID, t.Name, t.Hash, t.Prefix, now)
+		`INSERT INTO api_tokens (user_id, name, token_hash, prefix, created_at, can_run_sync) VALUES (?,?,?,?,?,?)`,
+		t.UserID, t.Name, t.Hash, t.Prefix, now, t.CanRunSync)
 	if err != nil {
 		return err
 	}
@@ -64,9 +64,13 @@ func (d *DB) ListAPITokens(ctx context.Context, userID int64) ([]models.APIToken
 
 // GetAPITokenByHash resolves a presented token. Revoked tokens and tokens whose
 // owner is gone or disabled must not authenticate, so the join enforces both.
+//
+// The column list is derived from tokenCols rather than written out again: the
+// two drifted apart once already when a column was added, and the symptom was
+// every token failing to authenticate.
 func (d *DB) GetAPITokenByHash(ctx context.Context, hash string) (*models.APIToken, error) {
 	return scanToken(d.r.QueryRowContext(ctx,
-		`SELECT t.id, t.user_id, t.name, t.token_hash, t.prefix, t.created_at, t.last_used_at, t.revoked_at
+		`SELECT `+prefixCols("t.", tokenCols)+`
 		 FROM api_tokens t JOIN users u ON u.id = t.user_id
 		 WHERE t.token_hash=? AND t.revoked_at IS NULL AND u.disabled=0`, hash))
 }
