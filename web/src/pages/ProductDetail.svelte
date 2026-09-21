@@ -116,10 +116,8 @@
   <FilterBar showProduct={false} />
 
   {#if summary}
-    <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
       <KpiCard metric="downloads" label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
-      <KpiCard metric="updates" label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
-      <KpiCard metric="uninstalls" label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
       <KpiCard metric="crashes" label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
       <KpiCard label="Avg review rating" value={summary.reviews?.avg ?? null} format={fmtRating} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.avg]))} />
       <KpiCard label="Reviews" value={summary.reviews?.count ?? 0} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.count]))} />

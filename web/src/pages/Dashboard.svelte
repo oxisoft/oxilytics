@@ -20,6 +20,7 @@
   let crashes = $state(null);
   let countries = $state(null);
   let products = $state(null);
+  let apps = $state(null);
   let reviews = $state(null);
   let sync = $state(null);
   let bucket = $state('day');
@@ -28,16 +29,29 @@
 
   const group = $derived(filter.product ? 'platform' : 'product');
 
+  // Every app that had a download in the range, biggest first. Apps with zero
+  // downloads are dropped rather than listed as a tail of noughts; the count
+  // is still visible on the Products screen.
+  // filter() already returns a fresh array, but sorting the result of a bare
+  // (apps || []) would sort the state array in place, so keep the copy.
+  const topApps = $derived(
+    (apps || [])
+      .filter((a) => (a.downloads || 0) > 0)
+      .toSorted((x, y) => (y.downloads || 0) - (x.downloads || 0))
+  );
+  const topMax = $derived(topApps.length ? topApps[0].downloads : 0);
+
   async function load() {
     loading = true; error = '';
     const p = filter.params;
     try {
-      [summary, downloads, crashes, countries, products, reviews, sync] = await Promise.all([
+      [summary, downloads, crashes, countries, products, apps, reviews, sync] = await Promise.all([
         api.get('/metrics/summary' + qs(p)),
         api.get('/metrics/series' + qs({ ...p, metric: 'downloads', group, bucket })),
         api.get('/metrics/series' + qs({ ...p, metric: 'crashes', group: 'platform', bucket })),
         api.get('/metrics/countries' + qs({ ...p, limit: 10 })),
         api.get('/products' + qs({ from: p.from, to: p.to })),
+        api.get('/apps' + qs({ from: p.from, to: p.to })),
         api.get('/reviews' + qs({ ...p, per_page: 5 })),
         api.get('/sync/status'),
       ]);
@@ -84,41 +98,71 @@
       <a href="/sync" use:link class="btn-primary">Go to Sync</a>
     </EmptyState>
   {:else}
-    <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      <KpiCard metric="downloads" label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
-      <KpiCard metric="updates" label="Updates" value={summary.totals.updates} prev={summary.prev.updates} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.updates]))} />
-      <KpiCard metric="uninstalls" label="Uninstalls" value={summary.totals.uninstalls} prev={summary.prev.uninstalls} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.uninstalls]))} />
-      <KpiCard metric="crashes" label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
-      <KpiCard label="Avg review rating" value={summary.reviews?.avg ?? null} format={fmtRating} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.avg]))} sub="reviews in range" />
-      <KpiCard label="New reviews" value={summary.reviews?.count ?? 0} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.count]))} />
-    </div>
-
     <div class="mb-4 grid gap-4 lg:grid-cols-3">
-      <div class="card lg:col-span-2">
-        <div class="mb-2 flex items-center justify-between">
-          <h2 class="font-medium">Downloads</h2>
-          <div class="flex gap-1 text-xs" role="group">
-            {#each ['day', 'week', 'month'] as b}<button class="rounded px-2 py-0.5 {bucket === b ? 'bg-zinc-100 font-medium dark:bg-zinc-800' : 'text-zinc-500'}" onclick={() => (bucket = b)}>{b}</button>{/each}
-          </div>
+      <!--
+        Left column stacks the KPI cards on top of the downloads chart so the
+        right column can run their full combined height: "all apps sorted by
+        downloads" needs vertical room, and the two KPI slots freed by dropping
+        the single-store cards are exactly that room.
+      -->
+      <div class="flex flex-col gap-4 lg:col-span-2">
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <KpiCard metric="downloads" label="Downloads" value={summary.totals.downloads} prev={summary.prev.downloads} split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.downloads]))} />
+          <KpiCard metric="crashes" label="Crashes" value={summary.totals.crashes} prev={summary.prev.crashes} invert split={Object.fromEntries(Object.entries(summary.by_platform).map(([k, v]) => [k, v.crashes]))} />
+          <KpiCard label="Avg review rating" value={summary.reviews?.avg ?? null} format={fmtRating} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.avg]))} sub="reviews in range" />
+          <KpiCard label="New reviews" value={summary.reviews?.count ?? 0} split={Object.fromEntries(Object.entries(summary.reviews?.by_platform || {}).map(([k, v]) => [k, v.count]))} />
         </div>
-        {#if downloads?.series?.length}
-          <ChartView type="line" labels={downloads.buckets} series={downloads.series.map((s) => ({ key: s.key, label: s.label, values: s.values }))} yFormat={fmtCompact} />
-        {:else}<p class="py-16 text-center text-sm text-zinc-400">No downloads in this range</p>{/if}
+        <div class="card">
+          <div class="mb-2 flex items-center justify-between">
+            <h2 class="font-medium">Downloads</h2>
+            <div class="flex gap-1 text-xs" role="group">
+              {#each ['day', 'week', 'month'] as b}<button class="rounded px-2 py-0.5 {bucket === b ? 'bg-zinc-100 font-medium dark:bg-zinc-800' : 'text-zinc-500'}" onclick={() => (bucket = b)}>{b}</button>{/each}
+            </div>
+          </div>
+          {#if downloads?.series?.length}
+            <ChartView type="line" labels={downloads.buckets} series={downloads.series.map((s) => ({ key: s.key, label: s.label, values: s.values }))} yFormat={fmtCompact} />
+          {:else}<p class="py-16 text-center text-sm text-zinc-400">No downloads in this range</p>{/if}
+        </div>
       </div>
-      <div class="card">
-        <h2 class="mb-2 font-medium">Platform share</h2>
-        {#if platformShare.length}
-          <ChartView type="doughnut" labels={platformShare.map((s) => s.label)} series={[{ label: 'Downloads', values: platformShare.map((s) => s.values[0]), keys: platformShare.map((s) => s.key) }]} />
-        {:else}<p class="py-16 text-center text-sm text-zinc-400">—</p>{/if}
+
+      <div class="card flex flex-col">
+        <h2 class="mb-2 font-medium">Top performers</h2>
+        <!--
+          Per app, not per product: a product can bundle an iOS and an Android
+          app whose numbers come from different stores, and the question here
+          is which individual app actually pulls downloads.
+        -->
+        {#if topApps.length}
+          <ul class="flex-1 space-y-1.5 overflow-y-auto pr-1 text-sm">
+            {#each topApps as a (a.id)}
+              <li class="flex items-center gap-2">
+                <PlatformGlyph platform={a.platform} class="h-3.5 w-3.5 shrink-0" />
+                <span class="truncate" title={a.name}>{a.name}</span>
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                  <div class="hidden h-2 w-16 overflow-hidden rounded bg-zinc-100 sm:block dark:bg-zinc-800">
+                    <div class="h-full bg-brand-500" style="width:{topMax ? (a.downloads / topMax) * 100 : 0}%"></div>
+                  </div>
+                  <span class="w-12 text-right tabular-nums">{fmtCompact(a.downloads)}</span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {:else}<p class="py-12 text-center text-sm text-zinc-400">No downloads in this range</p>{/if}
       </div>
     </div>
 
     <div class="mb-4 grid gap-4 lg:grid-cols-3">
-      <div class="card lg:col-span-2">
+      <div class="card">
         <h2 class="mb-2 font-medium">Crashes</h2>
         {#if crashes?.series?.length}
           <ChartView type="bar" stacked labels={crashes.buckets} series={crashes.series.map((s) => ({ key: s.key, label: PLATFORM_LABEL[s.key] || s.label, values: s.values }))} height={200} />
         {:else}<p class="py-12 text-center text-sm text-zinc-400">No crashes reported</p>{/if}
+      </div>
+      <div class="card">
+        <h2 class="mb-2 font-medium">Platform share</h2>
+        {#if platformShare.length}
+          <ChartView type="doughnut" labels={platformShare.map((s) => s.label)} series={[{ label: 'Downloads', values: platformShare.map((s) => s.values[0]), keys: platformShare.map((s) => s.key) }]} height={200} />
+        {:else}<p class="py-12 text-center text-sm text-zinc-400">—</p>{/if}
       </div>
       <div class="card">
         <h2 class="mb-2 font-medium">Top countries</h2>
