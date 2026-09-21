@@ -153,20 +153,45 @@ func (t *Tester) testGPlay(ctx context.Context, res *setup.TestResult) {
 		res.Step("report files", false, "bucket is empty — Google generates reports the day after the first installs")
 		return
 	}
-	pkg := ""
+	// Test reviews against a package we actually own. The bucket can contain
+	// reports for apps transferred in from another developer account: the
+	// service account can read their bulk reports but has no Play Console
+	// permission on them, so reviews.list returns 403 for those packages while
+	// working perfectly for ours. Testing whichever package sorts first paints
+	// the whole card red on a correctly configured install.
+	pkgs := make([]string, 0, 8)
 	for _, o := range objs {
-		if _, p, _, ok := googleplay.ClassifyObject(o.Name); ok {
-			pkg = p
-			break
+		if _, p, _, ok := googleplay.ClassifyObject(o.Name); ok && p != "" {
+			pkgs = append(pkgs, p)
 		}
 	}
-	if pkg == "" {
+	if len(pkgs) == 0 {
 		res.Step("report files", false, "no recognisable installs_<package>_YYYYMM files")
 		return
 	}
-	if _, err := c.Reviews(ctx, pkg); err != nil {
-		res.Step("Android Publisher reviews.list", false, explain(err)+" — enable the API in the Cloud project and grant 'View app information'")
-	} else {
-		res.Step("Android Publisher reviews.list", true, "readable for "+pkg)
+	var lastErr error
+	var okPkg string
+	tried := 0
+	seen := map[string]bool{}
+	for _, p := range pkgs {
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		tried++
+		if _, err := c.Reviews(ctx, p); err != nil {
+			lastErr = err
+			continue
+		}
+		okPkg = p
+		break
+	}
+	switch {
+	case okPkg != "":
+		res.Step("Android Publisher reviews.list", true, "readable for "+okPkg)
+	default:
+		res.Step("Android Publisher reviews.list", false,
+			fmt.Sprintf("%s — tried %d package(s); enable the API in the Cloud project and grant 'View app information'",
+				explain(lastErr), tried))
 	}
 }

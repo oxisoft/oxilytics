@@ -79,8 +79,15 @@ Google Cloud project.
    4. Send invite (a service account accepts automatically).
 4. **Find the reports bucket**
    1. Play Console → **Download reports → Statistics** (any app).
-   2. Click **Copy Cloud Storage URI** — it looks like `gs://pubsite_prod_rev_01234567890123456789/stats/installs/`.
-   3. The bucket name is the `pubsite_prod_rev_…` part.
+   2. Click **Copy Cloud Storage URI** — it looks like `gs://pubsite_prod_7585836991776671048/stats/installs/`.
+   3. The bucket name is the `pubsite_prod_…` part.
+
+   > **The bucket name has no `rev_`.** Google's own help page still documents
+   > `pubsite_prod_rev_…`, and older accounts do use that form, but the URI the
+   > Console copies today is `pubsite_prod_<developer-id>` — the digits are the
+   > Play developer account ID. Copy the real URI rather than composing one from
+   > the docs; a wrong bucket fails as a 403, which reads like a permissions
+   > problem and sends you debugging the wrong thing.
 5. Copy `gplay-sa.json` into `secrets/` and set:
 
    ```
