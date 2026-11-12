@@ -19,6 +19,18 @@ type mock struct {
 	requests    []appstoreconnect.ReportRequest
 	segments    map[string]string // report name → TSV
 	granularity map[string]string // report name → the ONE granularity Apple offers
+	platforms   map[string][]string
+	platformErr error
+}
+
+func (m *mock) Platforms(ctx context.Context, appID string) ([]string, error) {
+	if m.platformErr != nil {
+		return nil, m.platformErr
+	}
+	if p, ok := m.platforms[appID]; ok {
+		return p, nil
+	}
+	return []string{"IOS"}, nil
 }
 
 func (m *mock) Apps(ctx context.Context) ([]appstoreconnect.App, error) {

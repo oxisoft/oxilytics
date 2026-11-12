@@ -28,6 +28,7 @@ const (
 // Client is the subset of appstoreconnect.Client we use (mockable).
 type Client interface {
 	Apps(ctx context.Context) ([]appstoreconnect.App, error)
+	Platforms(ctx context.Context, appID string) ([]string, error)
 	Lookup(ctx context.Context, appID, country string) (*appstoreconnect.Lookup, error)
 	Reviews(ctx context.Context, appID string, since time.Time, fn func([]appstoreconnect.Review) bool) error
 	ReportRequests(ctx context.Context, appID string) ([]appstoreconnect.ReportRequest, error)
@@ -66,16 +67,15 @@ func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]m
 		return nil, &osync.FatalError{Err: fmt.Errorf("list apps: %w", err)}
 	}
 	for _, a := range apps {
-		platform := models.PlatformIOS
 		var icon *string
+		lookupMac := false
 		if lk, err := in.c.Lookup(ctx, a.ID, "us"); err == nil {
 			if lk.ArtworkURL != "" {
 				icon = &lk.ArtworkURL
 			}
-			if lk.Kind == "mac-software" {
-				platform = models.PlatformMacOS
-			}
+			lookupMac = lk.Kind == "mac-software"
 		}
+		platform := in.platform(ctx, rc, a, lookupMac)
 		bundle := a.BundleID
 		row, created, err := rc.DB.UpsertApp(ctx, &models.App{Store: models.StoreAppStore, StoreAppID: a.ID, Name: a.Name, BundleID: &bundle, Platform: platform, IconURL: icon})
 		if err != nil {
@@ -91,6 +91,41 @@ func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]m
 		return nil, err
 	}
 	return in.dropRemoved(rc, apps, known), nil
+}
+
+// platform decides iOS vs macOS for an App Store Connect app record.
+//
+// The authority is App Store Connect's own version list: a record whose
+// versions are all MAC_OS is a macOS app. The public iTunes lookup used before
+// only knows released apps, so every unreleased macOS record (OxiTick and
+// OxiTalk desktop, 2026-11-12) defaulted to iOS and could not be linked to the
+// product that already had the real iOS listing. A record with an IOS version
+// stays iOS (universal purchase: one record, one listing). The lookup is only
+// a fallback when the version list cannot be read.
+func (in *Ingester) platform(ctx context.Context, rc *osync.RunContext, a appstoreconnect.App, lookupMac bool) models.Platform {
+	ps, err := in.c.Platforms(ctx, a.ID)
+	if err != nil || len(ps) == 0 {
+		if err != nil {
+			rc.Log("info", nil, "%s: could not read App Store versions (%v); platform from public listing", a.Name, err)
+		}
+		if lookupMac {
+			return models.PlatformMacOS
+		}
+		return models.PlatformIOS
+	}
+	hasIOS, hasMac := false, false
+	for _, p := range ps {
+		switch p {
+		case "IOS":
+			hasIOS = true
+		case "MAC_OS":
+			hasMac = true
+		}
+	}
+	if hasMac && !hasIOS {
+		return models.PlatformMacOS
+	}
+	return models.PlatformIOS
 }
 
 // dropRemoved keeps only the apps App Store Connect still lists.

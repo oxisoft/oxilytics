@@ -192,6 +192,36 @@ func (c *Client) Apps(ctx context.Context) ([]App, error) {
 	return out, nil
 }
 
+// Platforms returns the platforms of the app's App Store versions, e.g.
+// ["IOS"], ["MAC_OS"] or both for a universal-purchase record. Unlike the
+// public iTunes lookup it works for apps that were never released, which is
+// how a macOS-only record (a separate App Store Connect app) is told apart
+// from an iOS one before launch.
+func (c *Client) Platforms(ctx context.Context, appID string) ([]string, error) {
+	q := url.Values{"fields[appStoreVersions]": {"platform"}, "limit": {"200"}}
+	rs, err := getAll[versionPlatformResource](ctx, c, "/v1/apps/"+appID+"/appStoreVersions", q, 0)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range rs {
+		p := r.Attributes.Platform
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+type versionPlatformResource struct {
+	ID         string `json:"id"`
+	Attributes struct {
+		Platform string `json:"platform"`
+	} `json:"attributes"`
+}
+
 // Ping is the cheapest authenticated call.
 func (c *Client) Ping(ctx context.Context) error {
 	_, err := c.do(ctx, "GET", "/v1/apps", url.Values{"limit": {"1"}}, nil)

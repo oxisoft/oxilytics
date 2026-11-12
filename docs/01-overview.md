@@ -11,7 +11,7 @@ reports are only kept for ~1 year, and Google Play `reviews.list` returns only t
 
 | Area | App Store Connect | Google Play |
 |------|-------------------|-------------|
-| App catalogue (name, id, icon, platform) | `GET /v1/apps` + iTunes lookup | package list from bucket file names + Android Publisher `edits.listings` / `edits.images` |
+| App catalogue (name, id, icon, platform) | `GET /v1/apps`, platform from `/v1/apps/{id}/appStoreVersions` (works before release), icon from the iTunes lookup | package list from bucket file names + Android Publisher `edits.listings` / `edits.images` |
 | Downloads / installs per day, per country | Analytics Reports API (`App Store Downloads` / `App Store Installation and Deletion`) | `stats/installs/*_overview.csv` and `*_country.csv` |
 | Updates | same reports | ❌ **not reported by Play at all** |
 | Uninstalls / deletions | same reports (⚠️ **weekly and volume-gated**) | same CSVs (daily) |

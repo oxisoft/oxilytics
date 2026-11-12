@@ -182,7 +182,7 @@ func (a *API) linkApp(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := a.DB.LinkApp(r.Context(), in.AppID, p.ID); err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			writeErr(w, 409, "platform_taken", "this product already has a "+string(app.Platform)+" listing")
+			writeErr(w, 409, "platform_taken", platformTakenMsg("this", app.Platform))
 			return
 		}
 		internalErr(w, err)
@@ -259,7 +259,7 @@ func (a *API) acceptSuggestion(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := a.DB.LinkApp(r.Context(), app.ID, *pid); err != nil {
 		if errors.Is(err, store.ErrConflict) {
-			writeErr(w, 409, "platform_taken", "that product already has a "+string(app.Platform)+" listing")
+			writeErr(w, 409, "platform_taken", platformTakenMsg("that", app.Platform))
 			return
 		}
 		internalErr(w, err)
@@ -400,4 +400,16 @@ func (a *API) listIgnored(w http.ResponseWriter, r *http.Request) {
 		rows = []store.IgnoredAppRow{}
 	}
 	writeJSON(w, 200, rows)
+}
+
+// platformTakenMsg explains a refused link. A product holds one listing per
+// platform; a macOS app is its own platform, so "already has an iOS listing"
+// on a Mac app means the store record was classified wrongly, which the hint
+// makes visible instead of reading like a rule the user broke.
+func platformTakenMsg(which string, p models.Platform) string {
+	label := map[models.Platform]string{models.PlatformIOS: "an iOS", models.PlatformMacOS: "a macOS", models.PlatformAndroid: "an Android"}[p]
+	if label == "" {
+		label = "a " + string(p)
+	}
+	return which + " product already has " + label + " listing (one listing per platform; unlink the other one first)"
 }
