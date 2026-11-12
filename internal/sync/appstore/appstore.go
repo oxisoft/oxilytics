@@ -86,7 +86,37 @@ func (in *Ingester) DiscoverApps(ctx context.Context, rc *osync.RunContext) ([]m
 		}
 		osync.SuggestProduct(ctx, rc, row)
 	}
-	return rc.DB.ListApps(ctx, store.AppFilter{Store: models.StoreAppStore})
+	known, err := rc.DB.ListApps(ctx, store.AppFilter{Store: models.StoreAppStore})
+	if err != nil {
+		return nil, err
+	}
+	return in.dropRemoved(rc, apps, known), nil
+}
+
+// dropRemoved keeps only the apps App Store Connect still lists.
+//
+// An app removed in App Store Connect stays in our database (its history is
+// real and stays visible), but every per-app endpoint now refuses it: Apple
+// answers its analytics report requests with 403 FORBIDDEN_ERROR rather than
+// 404, which reads exactly like a key without the App Manager role. Syncing
+// such an app aborted the whole run (0/13 apps, Oxi Pomodoro, 2026-11-12) for
+// a key that was fine. The app list is the authority on what still exists, so
+// an app absent from it is skipped with an info line, not attempted.
+func (in *Ingester) dropRemoved(rc *osync.RunContext, listed []appstoreconnect.App, known []models.App) []models.App {
+	live := make(map[string]bool, len(listed))
+	for _, a := range listed {
+		live[a.ID] = true
+	}
+	out := known[:0:0]
+	for _, app := range known {
+		if !live[app.StoreAppID] {
+			id := app.ID
+			rc.Log("info", &id, "%s (%s) is no longer in App Store Connect (removed); skipping, stored history is kept", app.Name, app.StoreAppID)
+			continue
+		}
+		out = append(out, app)
+	}
+	return out
 }
 
 // VerifyReportNames checks that Apple still offers every report we ask for,
